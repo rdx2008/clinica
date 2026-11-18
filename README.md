@@ -17,9 +17,15 @@ Gestão de clínicas (foco inicial: psicologia) com WhatsApp e IA. Escopo em [do
 5. `npx prisma migrate dev --name init`
 6. `npm run dev` → http://localhost:3000
 
+## Primeiro acesso
+
+Com o banco migrado e as variáveis `FIELD_ENCRYPTION_KEY` e `SESSION_SECRET` definidas, abra o sistema: a tela `/setup` cria a clínica e o primeiro administrador (some depois do primeiro cadastro). Administrador e profissional precisam ativar a verificação em duas etapas (TOTP) no primeiro login.
+
+Testes de segurança (criptografia, senha, TOTP, sessão): `npm test` em `web/`.
+
 ## Pendências técnicas (próximas sprints)
 
 - Migração SQL: RLS por `clinicId`, EXCLUDE constraint anti-sobreposição de horários (`btree_gist`), `audit_log` somente inserção.
-- Autenticação com MFA e perfis.
-- Criptografia de campo (CPF e conteúdo clínico).
+- Gestão de usuários (convidar, desativar, trocar perfil) e recuperação de senha.
+- Limitador de tentativas de login em Redis (hoje em memória, 1 réplica).
 - Webhook idempotente do WhatsApp (Cloud API).

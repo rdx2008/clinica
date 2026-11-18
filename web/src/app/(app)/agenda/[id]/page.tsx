@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { localDate, localTime, STATUS_LABEL } from "@/lib/agenda";
 import { formatPhoneBR } from "@/lib/br";
+import { formatBRL } from "@/lib/money";
+import { chargeFromAppointmentAction } from "@/app/actions/finance";
 import { rescheduleAction, setMeetingUrlAction, setStatusAction } from "@/app/actions/agenda";
 
 export const dynamic = "force-dynamic";
@@ -52,6 +54,12 @@ export default async function AppointmentPage({
         <p><span className="text-zinc-500">Serviço:</span> {a.service.name} ({online ? "online" : "presencial"})</p>
         <p><span className="text-zinc-500">Telefone:</span> {a.patient.phoneE164 ? formatPhoneBR(a.patient.phoneE164) : "—"}</p>
         <p><Link href={`/pacientes/${a.patient.id}`} className="underline">Ver ficha do paciente</Link></p>
+        {user.role !== "PROFISSIONAL" && (
+          <form action={chargeFromAppointmentAction}>
+            <input type="hidden" name="id" value={a.id} />
+            <button className="underline">Gerar cobrança ({formatBRL(a.service.priceCents)})</button>
+          </form>
+        )}
         {user.role === "PROFISSIONAL" && (
           <p><Link href={`/pacientes/${a.patient.id}/prontuario/novo?atendimento=${a.id}`} className="underline">Registrar evolução desta sessão</Link></p>
         )}

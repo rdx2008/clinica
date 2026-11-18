@@ -7,6 +7,7 @@ import type { AppointmentStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { audit } from "@/lib/audit";
+import { parseBRL } from "@/lib/money";
 import { ACTIVE_STATUSES, localDate, parseLocal, validMeetingUrl, weeklyOccurrences, MAX_RECURRENCE } from "@/lib/agenda";
 
 export type AppointmentFormState = { error?: string };
@@ -271,10 +272,10 @@ export async function createServiceAction(formData: FormData) {
   const back = (m: string): never => redirect(`/servicos?erro=${encodeURIComponent(m)}`);
   if (!parsed.success) return back(parsed.error.issues[0].message);
   const d = parsed.data;
-  const price = Number(d.price.replace(/\./g, "").replace(",", "."));
-  if (!Number.isFinite(price) || price < 0) return back("Valor inválido.");
+  const priceCents = parseBRL(d.price);
+  if (priceCents === null) return back("Valor inválido.");
   const s = await db.service.create({
-    data: { clinicId: user.clinicId, name: d.name, durationMin: d.durationMin, priceCents: Math.round(price * 100), modality: d.modality },
+    data: { clinicId: user.clinicId, name: d.name, durationMin: d.durationMin, priceCents, modality: d.modality },
   });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "SERVICO_CRIADO", entity: "Service", entityId: s.id });
   revalidatePath("/servicos");

@@ -29,6 +29,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/dashboard">Início</Link>
           {user.role !== "FINANCEIRO" && <Link href="/agenda">Agenda</Link>}
           {user.role !== "FINANCEIRO" && <Link href="/pacientes">Pacientes</Link>}
+          {(user.role === "ADMIN" || user.role === "RECEPCAO") && <Link href="/whatsapp">WhatsApp</Link>}
           {user.role === "ADMIN" && <Link href="/servicos">Serviços</Link>}
           {user.role === "ADMIN" && <Link href="/usuarios">Usuários</Link>}
           <Link href="/conta/senha">Minha senha</Link>

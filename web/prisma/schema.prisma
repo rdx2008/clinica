@@ -386,6 +386,7 @@ model WaConversation {
   messages WaMessage[]
   aiEvents AiEvent[]
 
+  @@unique([clinicId, waContact])
   @@index([clinicId, lastMsgAt])
 }
 

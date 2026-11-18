@@ -1,4 +1,6 @@
+import { after } from "next/server";
 import { Prisma } from "@prisma/client";
+import { handleInbound } from "@/lib/ai-runner";
 import { db } from "@/lib/db";
 import { encryptField } from "@/lib/crypto";
 import { isStopKeyword, parseWebhook, verifySignature, waToE164, WINDOW_MS } from "@/lib/whatsapp";
@@ -30,6 +32,7 @@ export async function POST(request: Request) {
     return new Response("Bad request", { status: 400 });
   }
   const { messages, statuses } = parseWebhook(payload);
+  const forAi: { conversationId: string; text: string }[] = [];
 
   try {
     for (const m of messages) {
@@ -62,6 +65,8 @@ export async function POST(request: Request) {
         throw e;
       }
 
+      if (m.type === "text" && m.text) forAi.push({ conversationId: conv.id, text: m.text });
+
       // Pedido de descadastro: revoga a autorização de WhatsApp do paciente (LGPD).
       if (patient && isStopKeyword(m.text)) {
         await db.consent.updateMany({
@@ -83,6 +88,18 @@ export async function POST(request: Request) {
   } catch {
     // 500 faz a Meta reenviar; a idempotência torna o reenvio seguro.
     return new Response("Error", { status: 500 });
+  }
+  // A IA responde depois de confirmar o recebimento à Meta (que espera resposta rápida).
+  if (forAi.length) {
+    after(async () => {
+      for (const item of forAi) {
+        try {
+          await handleInbound(item.conversationId, item.text);
+        } catch {
+          // falha da IA nunca derruba o webhook; a conversa segue para atendimento humano
+        }
+      }
+    });
   }
   return new Response("OK", { status: 200 });
 }

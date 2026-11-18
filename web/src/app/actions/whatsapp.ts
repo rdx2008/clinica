@@ -125,6 +125,29 @@ export async function toggleAutomationAction(formData: FormData) {
   redirect("/whatsapp/automacoes");
 }
 
+// ---- IA de recepção ----
+
+export async function saveAiConfigAction(formData: FormData) {
+  const user = await requireRole("ADMIN");
+  const back = (m: string): never => redirect(`/whatsapp/ia?erro=${encodeURIComponent(m)}`);
+  const info = String(formData.get("info") ?? "").trim();
+  const crisis = String(formData.get("crisisMessage") ?? "").trim();
+  const handoff = String(formData.get("handoffMessage") ?? "").trim();
+  const enabled = formData.get("enabled") === "on";
+  if (info.length > 4000) return back("O conteúdo aprovado pode ter no máximo 4000 caracteres.");
+  if (crisis.length > 800 || handoff.length > 400) return back("Mensagem muito longa.");
+  if (enabled && info.length < 20) return back("Preencha o conteúdo aprovado (horários, endereço, serviços, valores) antes de ligar a IA.");
+
+  const data = {
+    approvedContent: { enabled, info },
+    crisisProtocol: { message: crisis },
+    rules: { message: handoff },
+  };
+  await db.aiConfig.upsert({ where: { clinicId: user.clinicId }, create: { clinicId: user.clinicId, ...data }, update: data });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: enabled ? "IA_LIGADA" : "IA_DESLIGADA", entity: "AiConfig", entityId: user.clinicId });
+  redirect("/whatsapp/ia?ok=1");
+}
+
 // Atendente assume ou devolve a conversa para a IA (usado quando a IA de recepção existir).
 export async function setAiStateAction(formData: FormData) {
   const user = await requireRole("ADMIN", "RECEPCAO");

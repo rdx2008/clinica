@@ -39,7 +39,7 @@ export default async function ConversationPage({
         <div>
           <h1 className="text-xl font-semibold">{conv.patient?.fullName ?? formatPhoneBR(conv.waContact)}</h1>
           <p className="text-xs text-zinc-500">
-            {formatPhoneBR(conv.waContact)} · IA: {conv.aiState === "ATIVA" ? "ativa" : "pausada (atendimento humano)"}
+            {formatPhoneBR(conv.waContact)} · IA: {conv.aiState === "ATIVA" ? "ativa" : conv.aiState === "TRANSFERIDA" ? "transferida para a equipe" : "pausada (atendimento humano)"}
             {conv.patient && <> · <Link href={`/pacientes/${conv.patient.id}`} className="underline">ficha</Link></>}
           </p>
         </div>

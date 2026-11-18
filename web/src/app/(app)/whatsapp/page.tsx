@@ -24,6 +24,7 @@ export default async function WhatsappInbox() {
         <h1 className="text-xl font-semibold">WhatsApp</h1>
         {user.role === "ADMIN" && (
           <div className="flex gap-2">
+            <Link href="/whatsapp/ia" className="rounded border px-3 py-2 text-sm">IA</Link>
             <Link href="/whatsapp/automacoes" className="rounded border px-3 py-2 text-sm">Modelos e lembretes</Link>
             <Link href="/whatsapp/config" className="rounded border px-3 py-2 text-sm">Configuração</Link>
           </div>
@@ -43,6 +44,7 @@ export default async function WhatsappInbox() {
               <span>
                 <span className="font-medium">{c.patient?.fullName ?? formatPhoneBR(c.waContact)}</span>
                 {!c.patient && <span className="ml-2 text-xs text-amber-700">não vinculado a paciente</span>}
+                {c.aiState === "TRANSFERIDA" && <span className="ml-2 rounded bg-red-100 px-2 py-0.5 text-xs text-red-700">aguardando a equipe</span>}
               </span>
               <span className="text-xs text-zinc-500">
                 {c.lastMsgAt.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })}

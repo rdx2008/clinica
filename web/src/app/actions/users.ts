@@ -6,7 +6,7 @@ import { z } from "zod";
 import { Prisma, type Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
-import { getCurrentUser, requireRole } from "@/lib/session";
+import { createSession, getCurrentUser, requireRole } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import type { FormState } from "./auth";
 
@@ -120,7 +120,7 @@ export async function resetPasswordAction(formData: FormData) {
   const user = await targetUser(admin.clinicId, formData);
   const password = String(formData.get("password") ?? "");
   if (password.length < 12) back("A senha provisória deve ter ao menos 12 caracteres.");
-  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), mustChangePassword: true } });
+  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(password), mustChangePassword: true, sessionsValidAfter: new Date() } });
   await audit({ clinicId: admin.clinicId, userId: admin.id, action: "SENHA_REDEFINIDA", entity: "User", entityId: user.id });
   back(undefined, "Senha provisória definida. Será pedida a troca no próximo acesso.");
 }
@@ -128,7 +128,7 @@ export async function resetPasswordAction(formData: FormData) {
 export async function resetMfaAction(formData: FormData) {
   const admin = await requireRole("ADMIN");
   const user = await targetUser(admin.clinicId, formData);
-  await db.user.update({ where: { id: user.id }, data: { mfaSecret: null } });
+  await db.user.update({ where: { id: user.id }, data: { mfaSecret: null, sessionsValidAfter: new Date() } });
   await audit({ clinicId: admin.clinicId, userId: admin.id, action: "MFA_REDEFINIDO", entity: "User", entityId: user.id });
   back(undefined, "Verificação em duas etapas removida; o usuário configurará de novo no próximo acesso.");
 }
@@ -149,7 +149,8 @@ export async function changePasswordAction(_prev: FormState, formData: FormData)
   if (!(await verifyPassword(current, row.passwordHash))) return { error: "Senha atual incorreta." };
   if (current === next) return { error: "A nova senha deve ser diferente da atual." };
 
-  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false } });
+  await db.user.update({ where: { id: user.id }, data: { passwordHash: await hashPassword(next), mustChangePassword: false, sessionsValidAfter: new Date() } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "SENHA_ALTERADA", entity: "User", entityId: user.id });
+  await createSession(user.id); // outras sessões foram derrubadas; esta continua
   redirect("/dashboard");
 }

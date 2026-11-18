@@ -4,7 +4,7 @@ import { PasswordForm } from "./password-form";
 export const dynamic = "force-dynamic";
 
 export default async function PasswordPage() {
-  const user = await requireUser();
+  const user = await requireUser({ incomplete: true });
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-5 px-4">
       <div>

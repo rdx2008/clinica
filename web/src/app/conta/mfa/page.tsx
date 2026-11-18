@@ -6,7 +6,7 @@ import { MfaForm } from "./mfa-form";
 export const dynamic = "force-dynamic";
 
 export default async function MfaPage() {
-  const user = await requireUser();
+  const user = await requireUser({ incomplete: true });
   if (user.mfaSecret) redirect("/dashboard");
   const secret = generateTotpSecret();
   return (

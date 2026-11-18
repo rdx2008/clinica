@@ -12,7 +12,8 @@ const MAX_AGE_S = 60 * 60 * 8; // 8 horas
 export const MFA_REQUIRED: Role[] = ["ADMIN", "PROFISSIONAL"];
 
 export async function createSession(userId: string) {
-  const token = signToken({ uid: userId, exp: Date.now() + MAX_AGE_S * 1000 });
+  const now = Date.now();
+  const token = signToken({ uid: userId, iat: now, exp: now + MAX_AGE_S * 1000 });
   const store = await cookies();
   store.set(COOKIE, token, {
     httpOnly: true,
@@ -43,15 +44,26 @@ export const getCurrentUser = cache(async () => {
       active: true,
       mfaSecret: true,
       mustChangePassword: true,
+      sessionsValidAfter: true,
       clinic: { select: { name: true } },
     },
   });
-  return user && user.active ? user : null;
+  if (!user || !user.active) return null;
+  // Troca de senha/MFA derruba as sessões emitidas antes dela.
+  if (user.sessionsValidAfter && (payload.iat ?? 0) < user.sessionsValidAfter.getTime()) return null;
+  return user;
 });
 
-export async function requireUser() {
+// Por padrão exige conta completa: senha provisória trocada e MFA ativo (quando obrigatório).
+// Vale para páginas E ações de servidor, não só para o layout. As telas de configuração
+// dessas etapas usam { incomplete: true }.
+export async function requireUser(opts?: { incomplete?: boolean }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
+  if (!opts?.incomplete) {
+    if (user.mustChangePassword) redirect("/conta/senha");
+    if (MFA_REQUIRED.includes(user.role) && !user.mfaSecret) redirect("/conta/mfa");
+  }
   return user;
 }
 

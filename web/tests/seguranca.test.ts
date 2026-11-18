@@ -54,3 +54,10 @@ test("token de sessão: válido, expirado e adulterado", () => {
   assert.equal(verifyToken(`${forged}.${s}`, now), null);
   assert.equal(verifyToken(`${d}.x`, now), null);
 });
+
+test("token de sessão preserva o instante de emissão (iat)", async () => {
+  const { signToken, verifyToken } = await import("../src/lib/token.ts");
+  process.env.SESSION_SECRET = "x".repeat(40);
+  const t = signToken({ uid: "u1", iat: 1000, exp: Date.now() + 60_000 });
+  assert.equal(verifyToken(t)?.iat, 1000);
+});

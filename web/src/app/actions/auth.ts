@@ -1,5 +1,6 @@
 "use server";
 
+import { timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -9,6 +10,12 @@ import { verifyTotp } from "@/lib/totp";
 import { createSession, destroySession, getCurrentUser, MFA_REQUIRED } from "@/lib/session";
 import { audit, clientIp } from "@/lib/audit";
 import { clearFailures, registerFailure, tooManyAttempts } from "@/lib/rate-limit";
+
+function safeEqual(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
 
 export type FormState = { error?: string; needsCode?: boolean };
 
@@ -22,6 +29,14 @@ const setupSchema = z.object({
 // Só funciona enquanto não existe nenhum usuário (primeira instalação).
 export async function setupAction(_prev: FormState, formData: FormData): Promise<FormState> {
   if ((await db.user.count()) > 0) return { error: "O sistema já foi configurado." };
+
+  // Em produção a primeira configuração exige o código SETUP_TOKEN (definido no servidor),
+  // para que ninguém "reivindique" a instalação antes do dono.
+  const expected = process.env.SETUP_TOKEN;
+  if (process.env.NODE_ENV === "production") {
+    if (!expected) return { error: "Defina a variável SETUP_TOKEN no servidor para liberar a primeira configuração." };
+    if (!safeEqual(String(formData.get("setupToken") ?? ""), expected)) return { error: "Código de configuração incorreto." };
+  }
 
   const parsed = setupSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { error: parsed.error.issues[0].message };
@@ -53,7 +68,8 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   const { email, password, code } = parsed.data;
 
   const key = `${await clientIp()}|${email}`;
-  if (tooManyAttempts(key)) return { error: "Muitas tentativas. Aguarde 15 minutos e tente novamente." };
+  const emailKey = `email|${email}`; // limite por conta, mesmo se o atacante trocar de IP
+  if (tooManyAttempts(key) || tooManyAttempts(emailKey, 15)) return { error: "Muitas tentativas. Aguarde 15 minutos e tente novamente." };
 
   const user = await db.user.findFirst({ where: { email, active: true } });
   // Executa a verificação mesmo sem usuário para não revelar, pelo tempo, se o e-mail existe.
@@ -62,6 +78,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 
   if (!user || !passwordOk) {
     registerFailure(key);
+    registerFailure(emailKey);
     if (user) await audit({ clinicId: user.clinicId, userId: user.id, action: "LOGIN_FALHA", entity: "User", entityId: user.id });
     return { error: "E-mail ou senha incorretos." };
   }
@@ -70,12 +87,14 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
     if (!code) return { needsCode: true };
     if (!verifyTotp(decryptField(user.mfaSecret), code)) {
       registerFailure(key);
+      registerFailure(emailKey);
       await audit({ clinicId: user.clinicId, userId: user.id, action: "LOGIN_MFA_FALHA", entity: "User", entityId: user.id });
       return { needsCode: true, error: "Código de verificação inválido." };
     }
   }
 
   clearFailures(key);
+  clearFailures(emailKey);
   await audit({ clinicId: user.clinicId, userId: user.id, action: "LOGIN", entity: "User", entityId: user.id });
   await createSession(user.id);
   if (user.mustChangePassword) redirect("/conta/senha");

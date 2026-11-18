@@ -102,6 +102,7 @@ model User {
   role         Role
   active       Boolean  @default(true)
   mustChangePassword Boolean @default(false)
+  sessionsValidAfter DateTime? // sessões emitidas antes disso são recusadas
   createdAt    DateTime @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])

@@ -17,7 +17,8 @@ RUN npm run build
 FROM base AS run
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=build /app ./
+COPY --from=build --chown=node:node /app ./
+USER node
 EXPOSE 3000
 # Aplica migrações pendentes e inicia o servidor.
 CMD ["sh", "-c", "npx prisma migrate deploy && npm run start"]

@@ -305,7 +305,7 @@ const availabilitySchema = z.object({
 export async function addAvailabilityAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
   const parsed = availabilitySchema.safeParse(Object.fromEntries(formData));
-  const fail = (pid: string, m: string): never => redirect(`/agenda/disponibilidade?prof=${pid}&erro=${encodeURIComponent(m)}`);
+  const fail = (pid: string, m: string): never => redirect(`/agenda/disponibilidade?prof=${encodeURIComponent(pid)}&erro=${encodeURIComponent(m)}`);
   const pid = String(formData.get("professionalId") ?? "");
   if (!parsed.success) return fail(pid, "Dados inválidos.");
   const d = parsed.data;

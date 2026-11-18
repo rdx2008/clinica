@@ -3,7 +3,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // Token assinado (HMAC-SHA256) para o cookie de sessão. Formato: <payload>.<assinatura>
 // Segredo: SESSION_SECRET. O estado real (usuário ativo, perfil) é sempre relido do banco.
 
-export type SessionPayload = { uid: string; exp: number };
+// iat (ms) permite invalidar sessões antigas quando a senha/MFA muda (User.sessionsValidAfter).
+export type SessionPayload = { uid: string; exp: number; iat?: number };
 
 function secret(): string {
   const s = process.env.SESSION_SECRET;

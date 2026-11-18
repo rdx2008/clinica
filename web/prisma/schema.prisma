@@ -1,0 +1,515 @@
+// Schema inicial do MVP — ver docs/ESCOPO-UNIFICADO.md (seção 8).
+// Isolamento multi-tenant: toda tabela de negócio tem clinicId.
+// A política RLS no PostgreSQL será adicionada em migração SQL própria.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  RECEPCAO
+  PROFISSIONAL
+  FINANCEIRO
+}
+
+enum Modality {
+  PRESENCIAL
+  ONLINE
+}
+
+enum AppointmentStatus {
+  AGENDADA
+  CONFIRMADA
+  COMPARECEU
+  FALTOU
+  CANCELADA
+  REMARCADA
+}
+
+enum RecordType {
+  ANAMNESE
+  DEMANDA
+  EVOLUCAO
+  ENCAMINHAMENTO
+  ENCERRAMENTO
+  DOCUMENTO
+  ANOTACAO_PESSOAL
+}
+
+enum RecordStatus {
+  RASCUNHO
+  APROVADO
+}
+
+enum MessageDirection {
+  ENTRADA
+  SAIDA
+}
+
+enum AiState {
+  ATIVA
+  PAUSADA
+  TRANSFERIDA
+}
+
+enum ChargeStatus {
+  PENDENTE
+  PAGA
+  VENCIDA
+  CANCELADA
+}
+
+model Clinic {
+  id        String   @id @default(cuid())
+  name      String
+  cnpj      String?
+  timezone  String   @default("America/Sao_Paulo")
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  users         User[]
+  professionals Professional[]
+  services      Service[]
+  rooms         Room[]
+  patients      Patient[]
+  appointments  Appointment[]
+  records       ClinicalRecord[]
+  waAccounts    WaAccount[]
+  waTemplates   WaTemplate[]
+  conversations WaConversation[]
+  automations   Automation[]
+  aiConfig      AiConfig?
+  charges       Charge[]
+  packages      Package[]
+  payouts       Payout[]
+  auditLogs     AuditLog[]
+  importJobs    ImportJob[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  clinicId     String
+  name         String
+  email        String
+  passwordHash String
+  mfaSecret    String?
+  role         Role
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  professional Professional?
+
+  @@unique([clinicId, email])
+}
+
+model Professional {
+  id                String  @id @default(cuid())
+  clinicId          String
+  userId            String  @unique
+  councilType       String? // CRP, CRM...
+  councilNumber     String?
+  specialty         String?
+  defaultMeetingUrl String?
+
+  clinic       Clinic         @relation(fields: [clinicId], references: [id])
+  user         User           @relation(fields: [userId], references: [id])
+  availability Availability[]
+  blocks       Block[]
+  appointments Appointment[]
+  records      ClinicalRecord[]
+  payouts      Payout[]
+}
+
+model Service {
+  id           String   @id @default(cuid())
+  clinicId     String
+  name         String
+  durationMin  Int
+  priceCents   Int
+  modality     Modality @default(PRESENCIAL)
+  cancelPolicy Json     @default("{}")
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+  packages     Package[]
+}
+
+model Room {
+  id       String @id @default(cuid())
+  clinicId String
+  name     String
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+}
+
+model Patient {
+  id        String   @id @default(cuid())
+  clinicId  String
+  fullName  String
+  birthDate DateTime?
+  cpfEnc    String? // criptografado em nível de campo
+  phoneE164 String?
+  email     String?
+  source    String?
+  tags      String[]
+  status    String   @default("ATIVO")
+  dedupeKey String? // hash normalizado (nome + nascimento + telefone)
+  createdAt DateTime @default(now())
+
+  clinic       Clinic              @relation(fields: [clinicId], references: [id])
+  guardians    Guardian[]
+  contacts     AuthorizedContact[]
+  preferences  ContactPreference[]
+  consents     Consent[]
+  appointments Appointment[]
+  records      ClinicalRecord[]
+  conversations WaConversation[]
+  charges      Charge[]
+  packages     Package[]
+
+  @@index([clinicId, fullName])
+  @@index([clinicId, dedupeKey])
+}
+
+model Guardian {
+  id              String  @id @default(cuid())
+  patientId       String
+  name            String
+  relation        String?
+  phone           String?
+  isLegalGuardian Boolean @default(false)
+
+  patient Patient @relation(fields: [patientId], references: [id])
+}
+
+model AuthorizedContact {
+  id        String @id @default(cuid())
+  patientId String
+  name      String
+  phone     String
+  scope     String // ex.: "agenda", "financeiro"
+
+  patient Patient @relation(fields: [patientId], references: [id])
+}
+
+model ContactPreference {
+  id         String  @id @default(cuid())
+  patientId  String
+  channel    String  @default("WHATSAPP")
+  discreet   Boolean @default(true)
+  quietHours Json?
+
+  patient Patient @relation(fields: [patientId], references: [id])
+}
+
+model Consent {
+  id         String    @id @default(cuid())
+  patientId  String
+  type       String // TRATAMENTO_DADOS | WHATSAPP_OPTIN | TERMO_SERVICO
+  version    String
+  acceptedAt DateTime  @default(now())
+  channel    String?
+  revokedAt  DateTime?
+
+  patient Patient @relation(fields: [patientId], references: [id])
+}
+
+model ImportJob {
+  id        String   @id @default(cuid())
+  clinicId  String
+  fileKey   String
+  status    String   @default("PENDENTE")
+  report    Json?
+  createdAt DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+model Availability {
+  id             String @id @default(cuid())
+  professionalId String
+  weekday        Int // 0-6
+  startTime      String // HH:mm
+  endTime        String
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+}
+
+model Block {
+  id             String   @id @default(cuid())
+  professionalId String
+  startsAt       DateTime
+  endsAt         DateTime
+  reason         String?
+
+  professional Professional @relation(fields: [professionalId], references: [id])
+}
+
+model Recurrence {
+  id           String        @id @default(cuid())
+  rrule        String
+  appointments Appointment[]
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  clinicId       String
+  patientId      String
+  professionalId String
+  serviceId      String
+  roomId         String?
+  startsAt       DateTime
+  endsAt         DateTime
+  status         AppointmentStatus @default(AGENDADA)
+  recurrenceId   String?
+  source         String? // WHATSAPP | IA | MANUAL
+  idempotencyKey String?           @unique
+  meetingUrl     String?
+  createdAt      DateTime          @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  room         Room?         @relation(fields: [roomId], references: [id])
+  recurrence   Recurrence?   @relation(fields: [recurrenceId], references: [id])
+  records      ClinicalRecord[]
+  charges      Charge[]
+  runs         AutomationRun[]
+
+  @@index([clinicId, startsAt])
+  @@index([professionalId, startsAt])
+  // Anti-sobreposição: adicionar EXCLUDE constraint (btree_gist) em migração SQL.
+}
+
+model ClinicalRecord {
+  id             String       @id @default(cuid())
+  clinicId       String
+  patientId      String
+  professionalId String
+  appointmentId  String?
+  type           RecordType
+  contentEnc     String // conteúdo criptografado
+  status         RecordStatus @default(RASCUNHO)
+  version        Int          @default(1)
+  approvedAt     DateTime?
+  createdAt      DateTime     @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  professional Professional  @relation(fields: [professionalId], references: [id])
+  appointment  Appointment?  @relation(fields: [appointmentId], references: [id])
+  versions     ClinicalRecordVersion[]
+  attachments  ClinicalAttachment[]
+  grants       ClinicalAccessGrant[]
+
+  @@index([clinicId, patientId])
+}
+
+model ClinicalRecordVersion {
+  id         String   @id @default(cuid())
+  recordId   String
+  contentEnc String
+  authorId   String
+  createdAt  DateTime @default(now())
+
+  record ClinicalRecord @relation(fields: [recordId], references: [id])
+}
+
+model ClinicalAttachment {
+  id      String @id @default(cuid())
+  recordId String
+  fileKey String
+  mime    String
+  size    Int
+
+  record ClinicalRecord @relation(fields: [recordId], references: [id])
+}
+
+model ClinicalAccessGrant {
+  id        String    @id @default(cuid())
+  recordId  String
+  granteeId String
+  purpose   String
+  grantedBy String
+  expiresAt DateTime?
+
+  record ClinicalRecord @relation(fields: [recordId], references: [id])
+}
+
+model WaAccount {
+  id            String @id @default(cuid())
+  clinicId      String
+  phoneNumberId String
+  wabaId        String
+  tokenEnc      String
+  status        String @default("PENDENTE")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+model WaTemplate {
+  id       String @id @default(cuid())
+  clinicId String
+  name     String
+  category String // UTILITY | MARKETING | AUTHENTICATION
+  language String @default("pt_BR")
+  body     String
+  status   String @default("PENDENTE")
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  automations Automation[]
+  messages    WaMessage[]
+}
+
+model WaConversation {
+  id              String   @id @default(cuid())
+  clinicId        String
+  patientId       String?
+  waContact       String
+  assignedTo      String?
+  aiState         AiState  @default(ATIVA)
+  lastMsgAt       DateTime @default(now())
+  windowExpiresAt DateTime?
+
+  clinic   Clinic       @relation(fields: [clinicId], references: [id])
+  patient  Patient?     @relation(fields: [patientId], references: [id])
+  messages WaMessage[]
+  aiEvents AiEvent[]
+
+  @@index([clinicId, lastMsgAt])
+}
+
+model WaMessage {
+  id             String           @id @default(cuid())
+  conversationId String
+  direction      MessageDirection
+  type           String           @default("text")
+  body           String?
+  templateId     String?
+  waMessageId    String?          @unique // idempotência dos webhooks
+  status         String           @default("ENVIADA")
+  error          String?
+  createdAt      DateTime         @default(now())
+
+  conversation WaConversation @relation(fields: [conversationId], references: [id])
+  template     WaTemplate?    @relation(fields: [templateId], references: [id])
+}
+
+model Automation {
+  id         String  @id @default(cuid())
+  clinicId   String
+  trigger    String // ex.: LEMBRETE_D1, LEMBRETE_H2, POS_FALTA
+  offsetMin  Int
+  templateId String
+  active     Boolean @default(true)
+
+  clinic   Clinic          @relation(fields: [clinicId], references: [id])
+  template WaTemplate      @relation(fields: [templateId], references: [id])
+  runs     AutomationRun[]
+}
+
+model AutomationRun {
+  id            String    @id @default(cuid())
+  automationId  String
+  appointmentId String
+  scheduledFor  DateTime
+  status        String    @default("AGENDADA")
+  invalidatedAt DateTime?
+
+  automation  Automation  @relation(fields: [automationId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([status, scheduledFor])
+}
+
+model AiConfig {
+  id              String @id @default(cuid())
+  clinicId        String @unique
+  approvedContent Json   @default("{}")
+  rules           Json   @default("{}")
+  crisisProtocol  Json   @default("{}")
+  handoffHours    Json   @default("{}")
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+model AiEvent {
+  id                 String   @id @default(cuid())
+  conversationId     String
+  intent             String
+  action             String
+  confirmedByPatient Boolean  @default(false)
+  handoffReason      String?
+  createdAt          DateTime @default(now())
+
+  conversation WaConversation @relation(fields: [conversationId], references: [id])
+}
+
+model Charge {
+  id            String       @id @default(cuid())
+  clinicId      String
+  patientId     String
+  appointmentId String?
+  competence    String? // AAAA-MM
+  amountCents   Int
+  dueDate       DateTime
+  status        ChargeStatus @default(PENDENTE)
+  method        String?
+  paidAt        DateTime?
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  patient     Patient      @relation(fields: [patientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+}
+
+model Package {
+  id            String @id @default(cuid())
+  clinicId      String
+  patientId     String
+  serviceId     String
+  sessionsTotal Int
+  sessionsUsed  Int    @default(0)
+  priceCents    Int
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
+}
+
+model Payout {
+  id             String @id @default(cuid())
+  clinicId       String
+  professionalId String
+  period         String // AAAA-MM
+  grossCents     Int
+  shareCents     Int
+  status         String @default("PENDENTE")
+
+  clinic       Clinic       @relation(fields: [clinicId], references: [id])
+  professional Professional @relation(fields: [professionalId], references: [id])
+}
+
+// Somente inserção (reforçar com permissões/trigger no banco).
+model AuditLog {
+  id        String   @id @default(cuid())
+  clinicId  String
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId, createdAt])
+}

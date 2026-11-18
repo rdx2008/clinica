@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { MFA_REQUIRED, requireUser } from "@/lib/session";
@@ -11,6 +12,7 @@ const ROLE_LABEL = {
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  if (user.mustChangePassword) redirect("/conta/senha");
   // MFA obrigatório para administrador e profissional.
   if (MFA_REQUIRED.includes(user.role) && !user.mfaSecret) redirect("/conta/mfa");
 
@@ -23,9 +25,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             {user.name} · {ROLE_LABEL[user.role]}
           </p>
         </div>
-        <form action={logoutAction}>
-          <button className="rounded border px-3 py-1 text-sm">Sair</button>
-        </form>
+        <nav className="flex items-center gap-4 text-sm">
+          <Link href="/dashboard">Início</Link>
+          {user.role === "ADMIN" && <Link href="/usuarios">Usuários</Link>}
+          <Link href="/conta/senha">Minha senha</Link>
+          <form action={logoutAction}>
+            <button className="rounded border px-3 py-1">Sair</button>
+          </form>
+        </nav>
       </header>
       <main className="flex-1 p-4">{children}</main>
     </div>

@@ -101,6 +101,7 @@ model User {
   mfaSecret    String?
   role         Role
   active       Boolean  @default(true)
+  mustChangePassword Boolean @default(false)
   createdAt    DateTime @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])

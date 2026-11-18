@@ -78,6 +78,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   clearFailures(key);
   await audit({ clinicId: user.clinicId, userId: user.id, action: "LOGIN", entity: "User", entityId: user.id });
   await createSession(user.id);
+  if (user.mustChangePassword) redirect("/conta/senha");
   redirect(!user.mfaSecret && MFA_REQUIRED.includes(user.role) ? "/conta/mfa" : "/dashboard");
 }
 

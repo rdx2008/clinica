@@ -42,6 +42,7 @@ export const getCurrentUser = cache(async () => {
       role: true,
       active: true,
       mfaSecret: true,
+      mustChangePassword: true,
       clinic: { select: { name: true } },
     },
   });

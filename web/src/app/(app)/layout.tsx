@@ -33,6 +33,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {user.role !== "PROFISSIONAL" && <Link href="/financeiro">Financeiro</Link>}
           {user.role === "ADMIN" && <Link href="/servicos">Serviços</Link>}
           {user.role === "ADMIN" && <Link href="/usuarios">Usuários</Link>}
+          {user.role === "ADMIN" && <Link href="/auditoria">Auditoria</Link>}
           <Link href="/conta/senha">Minha senha</Link>
           <form action={logoutAction}>
             <button className="rounded border px-3 py-1">Sair</button>

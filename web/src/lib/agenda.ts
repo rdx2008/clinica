@@ -74,3 +74,8 @@ export const STATUS_LABEL: Record<string, string> = {
 
 // Status que ocupam o horário (cancelada/remarcada liberam).
 export const ACTIVE_STATUSES = ["AGENDADA", "CONFIRMADA", "COMPARECEU", "FALTOU"] as const;
+
+// Instante relativo a agora (isolado aqui para manter páginas livres de chamadas impuras).
+export function nowPlus(ms: number): Date {
+  return new Date(Date.now() + ms);
+}

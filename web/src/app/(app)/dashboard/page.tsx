@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { dayRange, localDate, localTime, STATUS_LABEL } from "@/lib/agenda";
+import { dayRange, localDate, localTime, nowPlus, STATUS_LABEL } from "@/lib/agenda";
 import { formatBRL } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ function Card({ title, value, href, hint }: { title: string; value: string | num
 
 export default async function DashboardPage() {
   const user = await requireUser();
-  const today = localDate(new Date());
+  const today = localDate(nowPlus(0));
   const range = dayRange(today)!;
   const clinicId = user.clinicId;
   const isProf = user.role === "PROFISSIONAL";
@@ -43,7 +43,7 @@ export default async function DashboardPage() {
         })
       : [],
     sees("ADMIN", "RECEPCAO")
-      ? db.waConversation.count({ where: { clinicId, messages: { some: {} }, NOT: { messages: { some: { direction: "SAIDA", createdAt: { gte: new Date(Date.now() - 24 * 3600_000) } } } }, windowExpiresAt: { gt: new Date() } } })
+      ? db.waConversation.count({ where: { clinicId, messages: { some: {} }, NOT: { messages: { some: { direction: "SAIDA", createdAt: { gte: nowPlus(-24 * 3600_000) } } } }, windowExpiresAt: { gt: nowPlus(0) } } })
       : 0,
     sees("ADMIN", "FINANCEIRO", "RECEPCAO")
       ? db.charge.aggregate({ where: { clinicId, status: "PENDENTE", dueDate: { lt: new Date(`${today}T00:00:00.000Z`) } }, _sum: { amountCents: true }, _count: true })

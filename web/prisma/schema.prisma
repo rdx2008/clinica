@@ -288,7 +288,7 @@ model Appointment {
 
   @@index([clinicId, startsAt])
   @@index([professionalId, startsAt])
-  // Anti-sobreposição: adicionar EXCLUDE constraint (btree_gist) em migração SQL.
+  // Anti-sobreposição: EXCLUDE constraint (btree_gist) na migração 20261118000000_appointment_no_overlap.
 }
 
 model ClinicalRecord {

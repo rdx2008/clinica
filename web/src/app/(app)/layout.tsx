@@ -27,7 +27,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         </div>
         <nav className="flex items-center gap-4 text-sm">
           <Link href="/dashboard">Início</Link>
+          {user.role !== "FINANCEIRO" && <Link href="/agenda">Agenda</Link>}
           {user.role !== "FINANCEIRO" && <Link href="/pacientes">Pacientes</Link>}
+          {user.role === "ADMIN" && <Link href="/servicos">Serviços</Link>}
           {user.role === "ADMIN" && <Link href="/usuarios">Usuários</Link>}
           <Link href="/conta/senha">Minha senha</Link>
           <form action={logoutAction}>

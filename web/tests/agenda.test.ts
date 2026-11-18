@@ -54,3 +54,17 @@ test("link de reunião aceita só http(s)", () => {
   assert.ok(!validMeetingUrl("javascript:alert(1)"));
   assert.ok(!validMeetingUrl("meet.google.com/abc"));
 });
+
+import { localWeekday, withinAvailability } from "../src/lib/agenda.ts";
+
+test("disponibilidade semanal: dentro, fora e sem janelas", () => {
+  // 2026-11-18 é quarta-feira (3)
+  const s = parseLocal("2026-11-18", "09:00")!;
+  const e = parseLocal("2026-11-18", "09:50")!;
+  assert.equal(localWeekday(s), 3);
+  const wins = [{ weekday: 3, startTime: "08:00", endTime: "12:00" }];
+  assert.ok(withinAvailability(s, e, wins));
+  assert.ok(withinAvailability(s, e, [])); // sem janelas: livre
+  assert.ok(!withinAvailability(parseLocal("2026-11-18", "11:30")!, parseLocal("2026-11-18", "12:20")!, wins)); // passa do fim
+  assert.ok(!withinAvailability(parseLocal("2026-11-19", "09:00")!, parseLocal("2026-11-19", "09:50")!, wins)); // outro dia
+});

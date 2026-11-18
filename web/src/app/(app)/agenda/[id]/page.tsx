@@ -103,6 +103,7 @@ export default async function AppointmentPage({
           <input type="hidden" name="id" value={a.id} />
           <input type="date" name="date" defaultValue={date} required className={input} />
           <input type="time" name="time" defaultValue={localTime(a.startsAt)} required className={input} />
+          <label className="flex items-center gap-1 text-xs"><input type="checkbox" name="outside" /> Encaixe</label>
           <button className={btn}>Remarcar</button>
         </form>
         <p className="text-xs text-zinc-500">A duração é mantida. A alteração fica registrada na auditoria.</p>

@@ -130,6 +130,10 @@ export default async function AgendaPage({
             ))}
           </ul>
 
+          <p className="text-sm">
+            <Link href={`/agenda/disponibilidade?prof=${selected.id}`} className="underline">Horários de atendimento de {selected.user.name}</Link>
+          </p>
+
           <details className="rounded border p-3 text-sm">
             <summary className="cursor-pointer font-medium">Bloquear horário</summary>
             <form action={addBlockAction} className="mt-2 flex flex-wrap items-center gap-2">

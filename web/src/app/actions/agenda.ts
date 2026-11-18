@@ -8,7 +8,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { parseBRL } from "@/lib/money";
-import { ACTIVE_STATUSES, localDate, parseLocal, validMeetingUrl, weeklyOccurrences, MAX_RECURRENCE } from "@/lib/agenda";
+import { ACTIVE_STATUSES, localDate, withinAvailability, parseLocal, validMeetingUrl, weeklyOccurrences, MAX_RECURRENCE } from "@/lib/agenda";
 
 export type AppointmentFormState = { error?: string };
 
@@ -83,6 +83,13 @@ export async function createAppointmentAction(_prev: AppointmentFormState, formD
     const url = d.meetingUrl || professional.defaultMeetingUrl;
     if (d.meetingUrl && !validMeetingUrl(d.meetingUrl)) return { error: "Link da videochamada inválido (use http:// ou https://)." };
     meetingUrl = url || null;
+  }
+
+  if (formData.get("outside") !== "on") {
+    const windows = await db.availability.findMany({ where: { professionalId: professional.id } });
+    if (occurrences.some((o) => !withinAvailability(o.startsAt, o.endsAt, windows))) {
+      return { error: "Fora do horário de atendimento do profissional. Marque \"Encaixe\" para agendar mesmo assim." };
+    }
   }
 
   if (await hasConflict(professional.id, occurrences)) {
@@ -171,6 +178,10 @@ export async function rescheduleAction(formData: FormData) {
   if (!start) backToDetail(id, "Data ou horário inválido.");
   const end = new Date(start.getTime() + (a.endsAt.getTime() - a.startsAt.getTime()));
 
+  if (formData.get("outside") !== "on") {
+    const windows = await db.availability.findMany({ where: { professionalId: a.professionalId } });
+    if (!withinAvailability(start, end, windows)) backToDetail(id, "Fora do horário de atendimento do profissional. Marque \"Encaixe\" para remarcar mesmo assim.");
+  }
   if (await hasConflict(a.professionalId, [{ startsAt: start, endsAt: end }], a.id)) backToDetail(id, CONFLICT);
   try {
     await db.$transaction([
@@ -280,4 +291,48 @@ export async function createServiceAction(formData: FormData) {
   await audit({ clinicId: user.clinicId, userId: user.id, action: "SERVICO_CRIADO", entity: "Service", entityId: s.id });
   revalidatePath("/servicos");
   redirect("/servicos");
+}
+
+// ---- Disponibilidade semanal do profissional ----
+
+const availabilitySchema = z.object({
+  professionalId: z.string().min(1),
+  weekday: z.coerce.number().int().min(0).max(6),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/),
+});
+
+export async function addAvailabilityAction(formData: FormData) {
+  const user = await requireRole(...ALLOWED);
+  const parsed = availabilitySchema.safeParse(Object.fromEntries(formData));
+  const fail = (pid: string, m: string): never => redirect(`/agenda/disponibilidade?prof=${pid}&erro=${encodeURIComponent(m)}`);
+  const pid = String(formData.get("professionalId") ?? "");
+  if (!parsed.success) return fail(pid, "Dados inválidos.");
+  const d = parsed.data;
+  const own = await ownProfessionalId(user);
+  const professionalId = own ?? d.professionalId;
+  const prof = await db.professional.findFirst({ where: { id: professionalId, clinicId: user.clinicId }, select: { id: true } });
+  if (!prof) redirect("/agenda");
+  if (d.endTime <= d.startTime) return fail(prof.id, "O horário final deve ser depois do inicial.");
+  const clash = await db.availability.findFirst({
+    where: { professionalId: prof.id, weekday: d.weekday, startTime: { lt: d.endTime }, endTime: { gt: d.startTime } },
+    select: { id: true },
+  });
+  if (clash) return fail(prof.id, "Já existe um horário que se sobrepõe a esse no mesmo dia.");
+  const row = await db.availability.create({ data: { professionalId: prof.id, weekday: d.weekday, startTime: d.startTime, endTime: d.endTime } });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "DISPONIBILIDADE_CRIADA", entity: "Availability", entityId: row.id });
+  redirect(`/agenda/disponibilidade?prof=${prof.id}`);
+}
+
+export async function removeAvailabilityAction(formData: FormData) {
+  const user = await requireRole(...ALLOWED);
+  const id = String(formData.get("id") ?? "");
+  const own = await ownProfessionalId(user);
+  const row = await db.availability.findFirst({
+    where: { id, professional: { clinicId: user.clinicId, ...(own ? { id: own } : {}) } },
+  });
+  if (!row) redirect("/agenda");
+  await db.availability.delete({ where: { id } });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "DISPONIBILIDADE_REMOVIDA", entity: "Availability", entityId: id });
+  redirect(`/agenda/disponibilidade?prof=${row.professionalId}`);
 }

@@ -63,6 +63,9 @@ export function AppointmentForm({
       <label className="block text-sm">Link da videochamada (só serviços online; vazio usa o link padrão do profissional)
         <input type="url" name="meetingUrl" placeholder="https://…" className={input} />
       </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" name="outside" /> Encaixe (permitir fora do horário de atendimento do profissional)
+      </label>
       <button disabled={pending} className="rounded bg-emerald-700 px-4 py-2 text-sm text-white disabled:opacity-60">
         {pending ? "Salvando…" : "Agendar"}
       </button>

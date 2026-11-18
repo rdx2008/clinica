@@ -79,3 +79,22 @@ export const ACTIVE_STATUSES = ["AGENDADA", "CONFIRMADA", "COMPARECEU", "FALTOU"
 export function nowPlus(ms: number): Date {
   return new Date(Date.now() + ms);
 }
+
+export type Window = { weekday: number; startTime: string; endTime: string };
+
+export const WEEKDAYS = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+
+// Dia da semana (0 = domingo) no fuso da clínica.
+export function localWeekday(d: Date): number {
+  return new Date(d.getTime() - 3 * 3600_000).getUTCDay();
+}
+
+// O atendimento cabe inteiro numa janela de atendimento do mesmo dia? Sem janelas cadastradas, não restringe.
+export function withinAvailability(start: Date, end: Date, windows: Window[]): boolean {
+  if (windows.length === 0) return true;
+  if (localDate(start) !== localDate(end)) return false;
+  const wd = localWeekday(start);
+  const s = localTime(start);
+  const e = localTime(end);
+  return windows.some((w) => w.weekday === wd && s >= w.startTime && e <= w.endTime);
+}

@@ -22,7 +22,12 @@ export default async function WhatsappInbox() {
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">WhatsApp</h1>
-        {user.role === "ADMIN" && <Link href="/whatsapp/config" className="rounded border px-3 py-2 text-sm">Configuração</Link>}
+        {user.role === "ADMIN" && (
+          <div className="flex gap-2">
+            <Link href="/whatsapp/automacoes" className="rounded border px-3 py-2 text-sm">Modelos e lembretes</Link>
+            <Link href="/whatsapp/config" className="rounded border px-3 py-2 text-sm">Configuração</Link>
+          </div>
+        )}
       </div>
       {!account && (
         <p className="rounded border p-4 text-sm text-zinc-600">

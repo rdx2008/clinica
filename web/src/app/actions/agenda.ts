@@ -172,7 +172,11 @@ export async function rescheduleAction(formData: FormData) {
 
   if (await hasConflict(a.professionalId, [{ startsAt: start, endsAt: end }], a.id)) backToDetail(id, CONFLICT);
   try {
-    await db.appointment.update({ where: { id }, data: { startsAt: start, endsAt: end, status: "AGENDADA" } });
+    await db.$transaction([
+      db.appointment.update({ where: { id }, data: { startsAt: start, endsAt: end, status: "AGENDADA" } }),
+      // Novo horário: libera os lembretes já enviados para serem reenviados.
+      db.automationRun.deleteMany({ where: { appointmentId: id } }),
+    ]);
   } catch (e) {
     if (isOverlapError(e)) backToDetail(id, CONFLICT);
     throw e;

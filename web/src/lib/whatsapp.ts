@@ -85,6 +85,52 @@ export function windowOpen(expiresAt: Date | null, now: Date = new Date()): bool
   return !!expiresAt && expiresAt > now;
 }
 
+// Quantidade de variáveis {{1}}, {{2}}... do corpo do modelo (maior índice usado).
+export function placeholderCount(body: string): number {
+  let max = 0;
+  for (const m of body.matchAll(/\{\{(\d+)\}\}/g)) max = Math.max(max, Number(m[1]));
+  return max;
+}
+
+export function renderTemplate(body: string, params: string[]): string {
+  return body.replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] ?? "");
+}
+
+// Envia mensagem modelo (única forma de iniciar conversa fora da janela de 24h).
+export async function sendTemplate(params: {
+  token: string;
+  phoneNumberId: string;
+  to: string;
+  name: string;
+  language: string;
+  vars: string[];
+}): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  try {
+    const res = await fetch(`https://graph.facebook.com/${GRAPH_VERSION}/${params.phoneNumberId}/messages`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${params.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        to: params.to.replace(/\D/g, ""),
+        type: "template",
+        template: {
+          name: params.name,
+          language: { code: params.language },
+          ...(params.vars.length
+            ? { components: [{ type: "body", parameters: params.vars.map((text) => ({ type: "text", text })) }] }
+            : {}),
+        },
+      }),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const json = (await res.json().catch(() => ({}))) as { messages?: { id: string }[]; error?: { message?: string } };
+    if (!res.ok || !json.messages?.[0]?.id) return { ok: false, error: json.error?.message ?? `Erro ${res.status} da API do WhatsApp` };
+    return { ok: true, id: json.messages[0].id };
+  } catch {
+    return { ok: false, error: "Não foi possível falar com o WhatsApp." };
+  }
+}
+
 // Envia texto livre (só permitido dentro da janela de 24h). Devolve o id da mensagem na Meta.
 export async function sendText(params: { token: string; phoneNumberId: string; to: string; body: string }): Promise<
   { ok: true; id: string } | { ok: false; error: string }

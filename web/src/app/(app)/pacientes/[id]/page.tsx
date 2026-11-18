@@ -61,6 +61,7 @@ export default async function PatientPage({
           </h1>
         </div>
         <div className="flex gap-2">
+          {user.role === "PROFISSIONAL" && <Link href={`/pacientes/${p.id}/prontuario`} className={btn}>Prontuário</Link>}
           <Link href={`/pacientes/${p.id}/editar`} className={btn}>Editar</Link>
           <form action={setPatientStatusAction}>
             <input type="hidden" name="patientId" value={p.id} />

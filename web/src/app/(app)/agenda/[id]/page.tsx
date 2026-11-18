@@ -52,6 +52,9 @@ export default async function AppointmentPage({
         <p><span className="text-zinc-500">Serviço:</span> {a.service.name} ({online ? "online" : "presencial"})</p>
         <p><span className="text-zinc-500">Telefone:</span> {a.patient.phoneE164 ? formatPhoneBR(a.patient.phoneE164) : "—"}</p>
         <p><Link href={`/pacientes/${a.patient.id}`} className="underline">Ver ficha do paciente</Link></p>
+        {user.role === "PROFISSIONAL" && (
+          <p><Link href={`/pacientes/${a.patient.id}/prontuario/novo?atendimento=${a.id}`} className="underline">Registrar evolução desta sessão</Link></p>
+        )}
       </section>
 
       {online && (

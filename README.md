@@ -29,3 +29,7 @@ Testes de segurança (criptografia, senha, TOTP, sessão): `npm test` em `web/`.
 - Gestão de usuários (convidar, desativar, trocar perfil) e recuperação de senha.
 - Limitador de tentativas de login em Redis (hoje em memória, 1 réplica).
 - Webhook idempotente do WhatsApp (Cloud API).
+
+## Deploy
+
+Veja o passo a passo para o Coolify em [docs/DEPLOY.md](docs/DEPLOY.md).

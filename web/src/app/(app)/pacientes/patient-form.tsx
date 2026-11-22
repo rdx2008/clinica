@@ -31,7 +31,7 @@ const input = "rounded border px-3 py-2 text-sm";
 export function PatientForm({ action, mode, initial }: Props) {
   const [state, onSubmit, pending] = useKeptActionState(action, {});
   return (
-    <form onSubmit={onSubmit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
+    <form method="post" onSubmit={onSubmit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <label className="flex flex-col gap-1 text-sm sm:col-span-2">
         Nome completo

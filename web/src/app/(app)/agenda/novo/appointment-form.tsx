@@ -31,7 +31,7 @@ export function AppointmentForm({
   const [patientId, setPatientId] = useState(defaults.patientId);
   const options = insurances.filter((i) => i.patientId === patientId);
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
+    <form method="post" onSubmit={onSubmit} className="space-y-3">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {state.error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{state.error}</p>}
 

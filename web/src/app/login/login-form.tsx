@@ -19,7 +19,7 @@ export function LoginForm() {
   }, initial);
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form method="post" onSubmit={onSubmit} className="flex flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm">
         E-mail
         <input name="email" type="email" required autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} className="rounded border px-3 py-2" />

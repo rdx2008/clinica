@@ -11,7 +11,7 @@ export function ImportForm() {
 
   return (
     <div className="space-y-4">
-      <form onSubmit={onSubmit} className="space-y-3 rounded border p-4">
+      <form method="post" onSubmit={onSubmit} className="space-y-3 rounded border p-4">
         <label className="block text-sm">
           Arquivo CSV
           <input type="file" name="file" accept=".csv,text/csv,text/plain" required className="mt-1 block w-full rounded border bg-white p-2 text-sm" />

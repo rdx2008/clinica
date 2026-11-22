@@ -130,7 +130,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           {days.map((d) => {
             const n = perDay.get(d) ?? 0;
             return (
-              <div key={d} className="group relative flex flex-1 flex-col items-center justify-end" title={`${d.split("-").reverse().slice(0, 2).join("/")}: ${n}`}>
+              <div key={d} className="group relative flex h-full flex-1 flex-col items-center justify-end" title={`${d.split("-").reverse().slice(0, 2).join("/")}: ${n}`}>
                 <div className="w-full rounded-t bg-emerald-600/80 group-hover:bg-emerald-700" style={{ height: `${Math.max(n > 0 ? 6 : 1, (n / maxDay) * 100)}%`, opacity: n === 0 ? 0.25 : 1 }} />
               </div>
             );

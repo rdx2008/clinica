@@ -80,6 +80,9 @@ export default async function DashboardPage() {
     newAnswers = rows.filter((r) => !r.seenAt && !(r.riskFlag && !r.riskAckAt)).map((r) => ({ patientId: r.patientId, name: names.get(r.patientId) ?? "Paciente", scale: r.scaleKey === "PHQ9" ? "PHQ-9" : "GAD-7" }));
   }
 
+  // Pedidos de pacote feitos por profissionais, à espera de venda.
+  const pendingPackages = sees("ADMIN", "FINANCEIRO", "RECEPCAO") ? await db.packageRequest.count({ where: { clinicId, status: "PENDENTE" } }) : 0;
+
   // Aniversariantes de hoje e dos próximos 7 dias.
   let birthdays: { id: string; name: string; label: string }[] = [];
   if (sees("ADMIN", "RECEPCAO")) {
@@ -127,6 +130,12 @@ export default async function DashboardPage() {
             ))}
           </ul>
         </section>
+      )}
+
+      {pendingPackages > 0 && (
+        <Link href="/financeiro/pacotes" className="block rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          {pendingPackages} pedido(s) de pacote de profissionais aguardando venda. <span className="underline">Abrir pacotes</span>
+        </Link>
       )}
 
       {stale.length > 0 && (

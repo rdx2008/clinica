@@ -6,10 +6,10 @@ import { canAccessPatient, RECORD_TYPE_LABEL, requireClinician } from "@/lib/cli
 
 export const dynamic = "force-dynamic";
 
-export default async function RecordsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tipo?: string }> }) {
+export default async function RecordsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tipo?: string; ok?: string }> }) {
   const { user, professionalId } = await requireClinician();
   const { id } = await params;
-  const { tipo } = await searchParams;
+  const { tipo, ok } = await searchParams;
   if (!(await canAccessPatient(user.clinicId, professionalId, id))) notFound();
 
   const [patient, records] = await Promise.all([
@@ -30,6 +30,7 @@ export default async function RecordsPage({ params, searchParams }: { params: Pr
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Prontuário</h1>
         <div className="flex gap-2">
+          <Link href={`/pacientes/${id}/solicitar-pacote`} className="rounded border px-3 py-2 text-sm">Solicitar pacote</Link>
           <Link href={`/pacientes/${id}/linha-do-tempo`} className="rounded border px-3 py-2 text-sm">Linha do tempo</Link>
           <Link href={`/pacientes/${id}/escalas`} className="rounded border px-3 py-2 text-sm">Escalas</Link>
           <Link href={`/pacientes/${id}/plano`} className="rounded border px-3 py-2 text-sm">Plano terapêutico</Link>
@@ -37,6 +38,7 @@ export default async function RecordsPage({ params, searchParams }: { params: Pr
           <Link href={`/pacientes/${id}/prontuario/novo`} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">Novo registro</Link>
         </div>
       </div>
+      {ok && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{ok}</p>}
       <p className="text-xs text-zinc-500">
         Conteúdo sigiloso: visível apenas para você. Administração e recepção não têm acesso aos registros.
       </p>

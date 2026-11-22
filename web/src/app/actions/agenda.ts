@@ -222,7 +222,7 @@ export async function setStatusAction(formData: FormData) {
       // Pacote de sessões: comparecer consome uma sessão; desfazer devolve.
       if (status === "COMPARECEU" && !packageId && !a.patientInsuranceId) {
         const pkgs = await tx.package.findMany({ where: { patientId: a.patientId, serviceId: a.serviceId, clinicId: user.clinicId }, orderBy: { createdAt: "asc" } });
-        const open = pkgs.find((p) => p.sessionsUsed < p.sessionsTotal);
+        const open = pkgs.find((p) => p.sessionsUsed < p.sessionsTotal && (!p.validUntil || p.validUntil.getTime() >= a.startsAt.getTime()));
         if (open) {
           await tx.package.update({ where: { id: open.id }, data: { sessionsUsed: { increment: 1 } } });
           packageId = open.id;

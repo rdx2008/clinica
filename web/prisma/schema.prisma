@@ -532,6 +532,8 @@ model Package {
   sessionsTotal Int
   sessionsUsed  Int    @default(0)
   priceCents    Int
+  planId        String? // modelo do catálogo usado na venda
+  validUntil    DateTime? // sessões só são consumidas até esta data
   createdAt     DateTime @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
@@ -912,4 +914,35 @@ model InsuranceBatch {
 
   @@unique([clinicId, number])
   @@index([insurerId, competence])
+}
+
+// Catálogo de pacotes definido pelo financeiro: preço e sessões fixos.
+model PackagePlan {
+  id           String   @id @default(cuid())
+  clinicId     String
+  name         String
+  serviceId    String
+  sessions     Int
+  priceCents   Int
+  validityDays Int? // validade após a venda (vazio = sem validade)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([clinicId, active])
+}
+
+// Pedido do profissional para a recepção/financeiro oferecer um pacote ao paciente.
+model PackageRequest {
+  id             String    @id @default(cuid())
+  clinicId       String
+  patientId      String
+  planId         String
+  professionalId String
+  note           String?
+  status         String    @default("PENDENTE") // PENDENTE | ATENDIDA | RECUSADA
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([clinicId, status])
 }

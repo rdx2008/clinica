@@ -10,7 +10,6 @@ import { parseBRL, validMonth } from "@/lib/money";
 import { payoutFigures } from "@/lib/payout";
 import { localDate } from "@/lib/agenda";
 
-const ROLES = ["ADMIN", "FINANCEIRO", "RECEPCAO"] as const;
 const METHODS = ["PIX", "DINHEIRO", "CARTAO", "TRANSFERENCIA", "OUTRO"];
 
 function dateOnly(s: string): Date | null {
@@ -76,8 +75,9 @@ const packageSchema = z.object({
   method: z.string().optional(),
 });
 
+// Venda avulsa com valor livre: só admin e financeiro. A recepção vende pelo catálogo (packages.ts).
 export async function createPackageAction(formData: FormData) {
-  const user = await requireRole(...ROLES);
+  const user = await requireRole("ADMIN", "FINANCEIRO");
   const back = (m: string): never => redirect(`/financeiro/pacotes?erro=${encodeURIComponent(m)}`);
   const parsed = packageSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return back(parsed.error.issues[0].message);

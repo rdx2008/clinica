@@ -114,3 +114,19 @@ Antes de ligar, em **WhatsApp → IA**: preencher o conteúdo aprovado (horário
 - **Webhook responde 401:** `WHATSAPP_APP_SECRET` diferente do segredo do app na Meta.
 - **Webhook responde 403 na verificação:** `WHATSAPP_VERIFY_TOKEN` diferente do digitado no painel.
 - **IA não responde:** falta `ANTHROPIC_API_KEY`, a IA está desligada em WhatsApp → IA, ou a conversa foi transferida/assumida por uma pessoa.
+
+## 10. Pix, nota fiscal (NFS-e) e portal do paciente
+
+**Gateway (Asaas)**
+1. Crie a conta no Asaas e gere a chave de API (comece pelo *sandbox*).
+2. No sistema: *Configurações → Pagamentos e nota fiscal*. Informe ambiente, chave e os dados fiscais padrão (serviço municipal, alíquota de ISS, descrição).
+3. Clique em *Testar conexão* e depois em *Cadastrar webhook no Asaas* (o sistema gera o segredo do webhook sozinho).
+4. Em *Financeiro*, cada cobrança pendente ganha *Gerar Pix*; cobranças pagas ganham *Emitir NFS-e* (nota de serviço, não de produto).
+5. Para a NFS-e funcionar, a prefeitura precisa aceitar emissão por integração e os dados fiscais devem estar completos no Asaas. Confirme com o contador.
+
+**Portal do paciente**
+1. *Configurações → Portal do paciente*: defina o endereço (ex.: `minha-clinica` → `/p/minha-clinica`).
+2. Para o link por e-mail, defina no Coolify: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` (e `SMTP_SECURE=true` se a porta for 465). Sem isso, gere o link manualmente na ficha do paciente.
+3. Informe a política de privacidade: nome e CPF do paciente são enviados ao Asaas ao gerar cobranças.
+
+**Anexos do prontuário** ficam no próprio banco, criptografados (PDF, imagem e áudio de até 10 MB). O backup do banco já os inclui.

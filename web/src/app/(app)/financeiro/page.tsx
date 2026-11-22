@@ -5,6 +5,7 @@ import { localDate } from "@/lib/agenda";
 import { effectiveStatus, formatBRL, shiftMonth, validMonth } from "@/lib/money";
 import { cancelChargeAction, markPaidAction } from "@/app/actions/finance";
 import { reopenChargeAction } from "@/app/actions/finance2";
+import { createPixAction, issueInvoiceAction, refreshInvoiceAction } from "@/app/actions/gateway";
 import { FinanceTabs } from "@/components/finance-tabs";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ const STYLE = {
 } as const;
 const METHOD: Record<string, string> = { PIX: "Pix", DINHEIRO: "Dinheiro", CARTAO: "Cartão", TRANSFERENCIA: "Transferência", OUTRO: "Outro" };
 
-export default async function FinancePage({ searchParams }: { searchParams: Promise<{ mes?: string; status?: string }> }) {
+export default async function FinancePage({ searchParams }: { searchParams: Promise<{ mes?: string; status?: string; erro?: string; ok?: string }> }) {
   const user = await requireRole("ADMIN", "FINANCEIRO", "RECEPCAO");
   const sp = await searchParams;
   const today = localDate(new Date());
@@ -30,7 +31,7 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
     db.charge.findMany({
       where: { clinicId: user.clinicId, competence: mes },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
-      include: { patient: { select: { fullName: true } } },
+      include: { patient: { select: { fullName: true } }, invoices: { orderBy: { createdAt: "desc" }, take: 1 } },
     }),
     canManage
       ? db.expense.aggregate({
@@ -61,6 +62,8 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
         </div>
       </div>
       <FinanceTabs active="/financeiro" mes={mes} limited={!canManage} />
+      {sp.erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{sp.erro}</p>}
+      {sp.ok && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{sp.ok}</p>}
 
       <div className="flex items-center gap-3 text-sm">
         <Link href={`/financeiro?mes=${shiftMonth(mes, -1)}`} className={btn}>←</Link>
@@ -111,6 +114,29 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
               {c.eff === "PAGA" && (
                 <>
                   <Link href={`/financeiro/${c.id}/recibo`} className={btn} target="_blank">Recibo</Link>
+                  {canManage && (() => {
+                    const inv = c.invoices[0];
+                    if (inv && inv.status !== "ERRO" && inv.status !== "CANCELADA") {
+                      return (
+                        <span className="flex items-center gap-1">
+                          <span className={`rounded px-2 py-0.5 text-xs ${inv.status === "EMITIDA" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+                            NFS-e {inv.status === "EMITIDA" ? `nº ${inv.number ?? ""}` : inv.status === "CANCELANDO" ? "cancelando" : "em processamento"}
+                          </span>
+                          {inv.pdfUrl && <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer" className={btn}>PDF</a>}
+                          {inv.status !== "EMITIDA" && (
+                            <form action={refreshInvoiceAction}><input type="hidden" name="id" value={inv.id} /><button className={btn}>Atualizar</button></form>
+                          )}
+                        </span>
+                      );
+                    }
+                    return (
+                      <form action={issueInvoiceAction} className="flex items-center gap-1">
+                        <input type="hidden" name="id" value={c.id} />
+                        {inv?.status === "ERRO" && <span className="text-xs text-red-700" title={inv.errorMessage ?? ""}>nota recusada</span>}
+                        <button className={btn}>Emitir NFS-e</button>
+                      </form>
+                    );
+                  })()}
                   {canManage && (
                     <form action={reopenChargeAction}>
                       <input type="hidden" name="id" value={c.id} />
@@ -121,6 +147,14 @@ export default async function FinancePage({ searchParams }: { searchParams: Prom
               )}
               {(c.eff === "PENDENTE" || c.eff === "VENCIDA") && (
                 <>
+                  {c.pixPayload ? (
+                    <Link href={`/financeiro/${c.id}/pix`} className={btn}>Ver Pix</Link>
+                  ) : (
+                    <form action={createPixAction}>
+                      <input type="hidden" name="id" value={c.id} />
+                      <button className={btn}>Gerar Pix</button>
+                    </form>
+                  )}
                   <form action={markPaidAction} className="flex items-center gap-1">
                     <input type="hidden" name="id" value={c.id} />
                     <select name="method" className={btn} defaultValue="PIX">

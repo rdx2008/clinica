@@ -55,6 +55,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p className="text-xs text-zinc-500">Esses dados aparecem em recibos e documentos impressos.</p>
       </section>
 
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded border p-5">
+        <div>
+          <h2>Pagamentos e nota fiscal</h2>
+          <p className="text-sm text-zinc-600">Pix com QR Code e emissão de NFS-e (nota de serviço) pelo Asaas.</p>
+        </div>
+        <a href="/configuracoes/pagamentos" className="rounded border px-4 py-2 text-sm">Configurar</a>
+      </section>
+
       <section className="space-y-3 rounded border p-5">
         <h2>Salas</h2>
         <ul className="divide-y text-sm">

@@ -95,6 +95,8 @@ model Clinic {
   recordTemplates RecordTemplate[]
   expenses      Expense[]
   quickReplies  QuickReply[]
+  paymentAccount PaymentAccount?
+  invoices      Invoice[]
   auditLogs     AuditLog[]
   importJobs    ImportJob[]
 }
@@ -181,6 +183,7 @@ model Patient {
   emergencyPhone String?
   insurance String? // convênio / plano
   adminNotes String? // observações administrativas (nunca clínicas)
+  gatewayCustomerId String? // id do cliente no gateway (cus_...)
   status    String   @default("ATIVO")
   dedupeKey String? // hash normalizado (nome + nascimento + telefone)
   createdAt DateTime @default(now())
@@ -503,10 +506,16 @@ model Charge {
   status        ChargeStatus @default(PENDENTE)
   method        String?
   paidAt        DateTime?
+  gatewayId     String?   @unique // id da cobrança no gateway (pay_...)
+  gatewayUrl    String? // link da fatura no gateway
+  pixPayload    String? // Pix copia e cola
+  pixQrImage    String? // QR Code em base64 (PNG)
+  pixExpiresAt  DateTime?
 
   clinic      Clinic       @relation(fields: [clinicId], references: [id])
   patient     Patient      @relation(fields: [patientId], references: [id])
   appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  invoices    Invoice[]
 }
 
 model Package {
@@ -629,4 +638,50 @@ model QuickReply {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@index([clinicId])
+}
+
+// Conta do gateway de pagamento (Asaas) e dados fiscais padrão da clínica.
+model PaymentAccount {
+  id           String   @id @default(cuid())
+  clinicId     String   @unique
+  provider     String   @default("ASAAS")
+  environment  String   @default("SANDBOX") // SANDBOX | PRODUCTION
+  apiKeyEnc    String // criptografada
+  webhookToken String // segredo enviado pelo gateway no cabeçalho do webhook (criptografado)
+  fiscal       Json     @default("{}") // serviço municipal, alíquotas, descrição padrão
+  status       String   @default("ATIVA")
+  createdAt    DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+// Nota fiscal de serviço (NFS-e) emitida pelo gateway.
+model Invoice {
+  id               String   @id @default(cuid())
+  clinicId         String
+  chargeId         String
+  patientId        String
+  provider         String   @default("ASAAS")
+  externalId       String?  @unique
+  status           String   @default("AGENDADA") // AGENDADA | EMITIDA | CANCELANDO | CANCELADA | ERRO
+  number           String?
+  pdfUrl           String?
+  xmlUrl           String?
+  valueCents       Int
+  serviceDescription String
+  errorMessage     String?
+  createdAt        DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  charge Charge @relation(fields: [chargeId], references: [id])
+
+  @@index([clinicId, createdAt])
+  @@index([chargeId])
+}
+
+// Eventos de webhook já processados (idempotência: o gateway pode reenviar).
+model WebhookEvent {
+  id         String   @id // id do evento no provedor
+  provider   String
+  receivedAt DateTime @default(now())
 }

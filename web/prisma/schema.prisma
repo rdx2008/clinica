@@ -356,6 +356,10 @@ model ClinicalAttachment {
   fileKey String
   mime    String
   size    Int
+  name       String   @default("")
+  data       Bytes? // conteúdo criptografado (AES-256-GCM)
+  uploadedBy String   @default("")
+  createdAt  DateTime @default(now())
 
   record ClinicalRecord @relation(fields: [recordId], references: [id])
 }

@@ -31,3 +31,18 @@ export function decryptField(payload: string): string {
 export function blindIndex(value: string): string {
   return createHmac("sha256", getKey()).update(value.trim().toLowerCase()).digest("base64url");
 }
+
+// Arquivos (anexos): AES-256-GCM. Formato binário: iv(12) | tag(16) | dados.
+export function encryptBuffer(plain: Buffer): Buffer {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", getKey(), iv);
+  const data = Buffer.concat([cipher.update(plain), cipher.final()]);
+  return Buffer.concat([iv, cipher.getAuthTag(), data]);
+}
+
+export function decryptBuffer(payload: Buffer): Buffer {
+  if (payload.length < 29) throw new Error("Arquivo criptografado inválido");
+  const decipher = createDecipheriv("aes-256-gcm", getKey(), payload.subarray(0, 12));
+  decipher.setAuthTag(payload.subarray(12, 28));
+  return Buffer.concat([decipher.update(payload.subarray(28)), decipher.final()]);
+}

@@ -167,3 +167,17 @@ export async function revokeGrantAction(formData: FormData) {
   await audit({ clinicId: user.clinicId, userId: user.id, action: "PRONTUARIO_COMPARTILHAMENTO_REVOGADO", entity: "ClinicalRecord", entityId: grant.recordId });
   redirect(`/pacientes/${grant.record.patientId}/prontuario/${grant.recordId}`);
 }
+
+// ---- Anexos: remover (somente em rascunho do próprio autor) ----
+
+export async function deleteAttachmentAction(formData: FormData) {
+  const { user, professionalId } = await requireClinician();
+  const id = String(formData.get("id") ?? "");
+  const att = await db.clinicalAttachment.findUnique({ where: { id }, include: { record: true } });
+  if (!att || att.record.clinicId !== user.clinicId || att.record.professionalId !== professionalId) redirect("/pacientes");
+  const path = `/pacientes/${att.record.patientId}/prontuario/${att.record.id}`;
+  if (att.record.status === "APROVADO") fail(path, "Registro aprovado não permite remover anexos.");
+  await db.clinicalAttachment.delete({ where: { id } });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "ANEXO_REMOVIDO", entity: "ClinicalRecord", entityId: att.record.id });
+  redirect(path);
+}

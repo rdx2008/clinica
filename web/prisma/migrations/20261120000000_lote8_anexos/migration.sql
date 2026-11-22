@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "ClinicalAttachment" ADD COLUMN     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ADD COLUMN     "data" BYTEA,
+ADD COLUMN     "name" TEXT NOT NULL DEFAULT '',
+ADD COLUMN     "uploadedBy" TEXT NOT NULL DEFAULT '';
+

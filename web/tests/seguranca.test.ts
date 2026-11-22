@@ -61,3 +61,14 @@ test("token de sessão preserva o instante de emissão (iat)", async () => {
   const t = signToken({ uid: "u1", iat: 1000, exp: Date.now() + 60_000 });
   assert.equal(verifyToken(t)?.iat, 1000);
 });
+
+test("anexos: criptografia de arquivo ida e volta e detecção de adulteração", async () => {
+  process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+  const { encryptBuffer, decryptBuffer } = await import("../src/lib/crypto.ts");
+  const plain = Buffer.from("conteúdo sigiloso do anexo");
+  const enc = encryptBuffer(plain);
+  assert.ok(!enc.includes(plain));
+  assert.deepEqual(decryptBuffer(enc), plain);
+  enc[enc.length - 1] ^= 1;
+  assert.throws(() => decryptBuffer(enc));
+});

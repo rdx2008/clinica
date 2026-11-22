@@ -5,6 +5,8 @@ import { decryptField } from "@/lib/crypto";
 import { audit } from "@/lib/audit";
 import { MAX_RECORD_CHARS, RECORD_TYPE_LABEL, requireClinician } from "@/lib/clinical";
 import { nowPlus } from "@/lib/agenda";
+import { formatBytes } from "@/lib/files";
+import { Attachments } from "./attachments";
 import {
   approveRecordAction,
   deleteDraftAction,
@@ -35,6 +37,7 @@ export default async function RecordPage({
       patient: { select: { fullName: true } },
       professional: { include: { user: { select: { name: true } } } },
       grants: true,
+      attachments: { select: { id: true, name: true, mime: true, size: true }, orderBy: { createdAt: "asc" } },
       _count: { select: { versions: true } },
     },
   });
@@ -114,6 +117,12 @@ export default async function RecordPage({
           </div>
         </>
       )}
+
+      <Attachments
+        recordId={rec.id}
+        canEdit={isAuthor && !approved}
+        items={rec.attachments.map((a) => ({ id: a.id, name: a.name || "arquivo", mime: a.mime, size: formatBytes(a.size) }))}
+      />
 
       {isAuthor && rec.type !== "ANOTACAO_PESSOAL" && (
         <section className="space-y-3 rounded border p-4">

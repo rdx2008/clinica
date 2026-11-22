@@ -174,6 +174,10 @@ export async function mergePatientsAction(formData: FormData) {
     db.guardian.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.authorizedContact.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.contactPreference.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.scaleAssignment.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.therapyPlan.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.documentAcceptance.deleteMany({ where: { patientId: dropId, documentId: { in: (await db.documentAcceptance.findMany({ where: { patientId: keepId }, select: { documentId: true } })).map((a) => a.documentId) } } }),
+    db.documentAcceptance.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     // completa campos vazios do cadastro mantido com os do duplicado
     db.patient.update({
       where: { id: keepId },

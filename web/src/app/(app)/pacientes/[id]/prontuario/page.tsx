@@ -30,6 +30,8 @@ export default async function RecordsPage({ params, searchParams }: { params: Pr
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Prontuário</h1>
         <div className="flex gap-2">
+          <Link href={`/pacientes/${id}/escalas`} className="rounded border px-3 py-2 text-sm">Escalas</Link>
+          <Link href={`/pacientes/${id}/plano`} className="rounded border px-3 py-2 text-sm">Plano terapêutico</Link>
           <Link href={`/pacientes/${id}/prontuario/novo?tipo=DOCUMENTO`} className="rounded border px-3 py-2 text-sm">Novo documento</Link>
           <Link href={`/pacientes/${id}/prontuario/novo`} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">Novo registro</Link>
         </div>

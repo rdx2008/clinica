@@ -23,6 +23,7 @@ function pagesFor(role: string): SearchHit[] {
     { label: "Pacotes de sessões", href: "/financeiro/pacotes", roles: ["ADMIN", "FINANCEIRO", "RECEPCAO"] },
     { label: "Repasses", href: "/financeiro/repasses", roles: ["ADMIN", "FINANCEIRO"] },
     { label: "Importar pacientes", href: "/pacientes/importar", roles: ["ADMIN", "RECEPCAO"] },
+    { label: "Termos e contratos", href: "/configuracoes/termos", roles: ["ADMIN"] },
     { label: "Serviços", href: "/servicos", roles: ["ADMIN"] },
     { label: "Usuários", href: "/usuarios", roles: ["ADMIN"] },
     { label: "Configurações", href: "/configuracoes", roles: ["ADMIN"] },

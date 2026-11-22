@@ -66,6 +66,20 @@ export default async function DashboardPage() {
       })
     : [];
 
+  // Profissional: alertas de risco e respostas novas de escalas (só dele).
+  let riskAlerts: { id: string; patientId: string; name: string; scale: string }[] = [];
+  let newAnswers: { patientId: string; name: string; scale: string }[] = [];
+  if (isProf && prof) {
+    const rows = await db.scaleAssignment.findMany({
+      where: { professionalId: prof.id, status: "RESPONDIDA", OR: [{ riskFlag: true, riskAckAt: null }, { seenAt: null }] },
+      orderBy: { answeredAt: "desc" },
+      take: 20,
+    });
+    const names = new Map((await db.patient.findMany({ where: { id: { in: rows.map((r) => r.patientId) } }, select: { id: true, fullName: true } })).map((p) => [p.id, p.fullName]));
+    riskAlerts = rows.filter((r) => r.riskFlag && !r.riskAckAt).map((r) => ({ id: r.id, patientId: r.patientId, name: names.get(r.patientId) ?? "Paciente", scale: r.scaleKey === "PHQ9" ? "PHQ-9" : "GAD-7" }));
+    newAnswers = rows.filter((r) => !r.seenAt && !(r.riskFlag && !r.riskAckAt)).map((r) => ({ patientId: r.patientId, name: names.get(r.patientId) ?? "Paciente", scale: r.scaleKey === "PHQ9" ? "PHQ-9" : "GAD-7" }));
+  }
+
   // Aniversariantes de hoje e dos próximos 7 dias.
   let birthdays: { id: string; name: string; label: string }[] = [];
   if (sees("ADMIN", "RECEPCAO")) {
@@ -91,6 +105,29 @@ export default async function DashboardPage() {
         {overdue && <Card title="Cobranças vencidas" value={formatBRL(overdue._sum.amountCents ?? 0)} href="/financeiro" hint={`${overdue._count} cobrança(s)`} />}
         {sees("ADMIN", "RECEPCAO") && <Card title="Pacientes ativos" value={patients} href="/pacientes" />}
       </div>
+
+      {riskAlerts.length > 0 && (
+        <section role="alert" className="space-y-2 rounded-2xl border border-red-300 bg-red-50 p-4">
+          <h2 className="text-red-900">Sinal de risco em escala ({riskAlerts.length})</h2>
+          <p className="text-xs text-red-800">Resposta de paciente com item de risco marcado. Avalie o quanto antes.</p>
+          <ul className="divide-y divide-red-200 text-sm">
+            {riskAlerts.map((r) => (
+              <li key={r.id}><Link href={`/pacientes/${r.patientId}/escalas`} className="flex justify-between gap-2 py-1.5 hover:underline"><span>{r.name}</span><span className="text-xs text-red-800">{r.scale}</span></Link></li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {newAnswers.length > 0 && (
+        <section className="space-y-2 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <h2 className="text-blue-900">Respostas novas de escalas ({newAnswers.length})</h2>
+          <ul className="divide-y divide-blue-200 text-sm">
+            {newAnswers.map((r, i) => (
+              <li key={i}><Link href={`/pacientes/${r.patientId}/escalas`} className="flex justify-between gap-2 py-1.5 hover:underline"><span>{r.name}</span><span className="text-xs text-blue-800">{r.scale}</span></Link></li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {stale.length > 0 && (
         <section className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">

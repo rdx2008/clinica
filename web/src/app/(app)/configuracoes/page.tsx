@@ -59,6 +59,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded border p-5">
         <div>
+          <h2>Termos e contratos</h2>
+          <p className="text-sm text-zinc-600">Termo de consentimento e contrato terapêutico, com aceite digital ou presencial.</p>
+        </div>
+        <a href="/configuracoes/termos" className="rounded border px-4 py-2 text-sm">Configurar</a>
+      </section>
+
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded border p-5">
+        <div>
           <h2>WhatsApp</h2>
           <p className="text-sm text-zinc-600">Conexão, modelos e lembretes, IA de recepção e respostas rápidas.</p>
         </div>

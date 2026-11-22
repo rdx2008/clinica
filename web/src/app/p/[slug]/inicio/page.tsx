@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getPortalSession, patientsForEmail } from "@/lib/portal";
 import { localDate, localTime, nowPlus, STATUS_LABEL } from "@/lib/agenda";
 import { effectiveStatus, formatBRL } from "@/lib/money";
+import { SCALES, type ScaleKey } from "@/lib/scales";
 import { confirmAppointmentPortalAction, createPortalPixAction, logoutPortalAction } from "@/app/actions/portal";
 
 export const dynamic = "force-dynamic";
@@ -36,6 +37,13 @@ export default async function PortalHome({ params, searchParams }: { params: Pro
       include: { invoices: { where: { status: "EMITIDA" }, take: 1 } },
     }),
   ]);
+  const [pendingScales, docs, accepted] = await Promise.all([
+    db.scaleAssignment.findMany({ where: { clinicId: s.clinic.id, patientId: { in: ids }, status: "PENDENTE" }, orderBy: { sentAt: "asc" } }),
+    db.clinicDocument.findMany({ where: { clinicId: s.clinic.id, active: true }, orderBy: { createdAt: "asc" } }),
+    db.documentAcceptance.findMany({ where: { clinicId: s.clinic.id, patientId: { in: ids } }, select: { patientId: true, documentId: true } }),
+  ]);
+  const acceptedKey = new Set(accepted.map((a) => `${a.patientId}|${a.documentId}`));
+  const pendingTerms = docs.filter((d) => ids.some((pid) => !acceptedKey.has(`${pid}|${d.id}`)));
   const open = charges.filter((c) => c.status === "PENDENTE");
   const paid = charges.filter((c) => c.status === "PAGA").slice(0, 10);
 
@@ -50,6 +58,26 @@ export default async function PortalHome({ params, searchParams }: { params: Pro
       </div>
       {sp.erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{sp.erro}</p>}
       {patients.length === 0 && <p className="rounded-lg border bg-white p-4 text-sm text-zinc-600">Não encontramos cadastro ativo para este e-mail.</p>}
+
+      {(pendingScales.length > 0 || pendingTerms.length > 0) && (
+        <section className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-amber-900">Pendências</h2>
+          <ul className="space-y-2 text-sm">
+            {pendingTerms.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>Ler e aceitar: <strong>{d.title}</strong></span>
+                <Link href={`/p/${slug}/termo/${d.id}`} className="rounded bg-emerald-700 px-3 py-1.5 text-white">Abrir</Link>
+              </li>
+            ))}
+            {pendingScales.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>Questionário: <strong>{SCALES[a.scaleKey as ScaleKey]?.name ?? a.scaleKey}</strong>{patients.length > 1 && <> ({name.get(a.patientId)})</>}</span>
+                <Link href={`/p/${slug}/questionario/${a.id}`} className="rounded bg-emerald-700 px-3 py-1.5 text-white">Responder</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h2>Próximas consultas</h2>

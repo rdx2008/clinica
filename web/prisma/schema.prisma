@@ -700,3 +700,91 @@ model PortalLink {
 
   @@index([clinicId, email])
 }
+
+// ---- Módulo clínico de psicologia ----
+
+// Aplicação de uma escala (PHQ-9, GAD-7...). As respostas e a pontuação ficam criptografadas.
+model ScaleAssignment {
+  id             String    @id @default(cuid())
+  clinicId       String
+  patientId      String
+  professionalId String
+  scaleKey       String // PHQ9 | GAD7
+  status         String    @default("PENDENTE") // PENDENTE | RESPONDIDA | CANCELADA
+  source         String    @default("PORTAL") // PORTAL | SESSAO
+  dataEnc        String? // JSON criptografado: { answers, score, severity }
+  riskFlag       Boolean   @default(false) // resposta de risco (ex.: item 9 do PHQ-9)
+  riskAckAt      DateTime? // profissional ciente do alerta
+  seenAt         DateTime? // profissional já viu o resultado
+  sentAt         DateTime  @default(now())
+  answeredAt     DateTime?
+
+  @@index([clinicId, patientId])
+  @@index([professionalId, status])
+}
+
+model TherapyPlan {
+  id             String   @id @default(cuid())
+  clinicId       String
+  patientId      String
+  professionalId String
+  focusEnc       String // formulação/foco do plano (criptografado)
+  status         String   @default("ATIVO") // ATIVO | CONCLUIDO
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  goals TherapyGoal[]
+
+  @@index([clinicId, patientId])
+}
+
+model TherapyGoal {
+  id         String    @id @default(cuid())
+  planId     String
+  textEnc    String // objetivo/meta (criptografado)
+  status     String    @default("EM_ANDAMENTO") // EM_ANDAMENTO | ALCANCADA | PAUSADA | ABANDONADA
+  progress   Int       @default(0) // 0 a 100
+  targetDate DateTime?
+  noteEnc    String? // último acompanhamento (criptografado)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  plan TherapyPlan @relation(fields: [planId], references: [id])
+
+  @@index([planId])
+}
+
+// Termos e contratos da clínica. Cada versão é imutável (uma linha por versão).
+model ClinicDocument {
+  id        String   @id @default(cuid())
+  clinicId  String
+  key       String // identifica o documento (ex.: tcle, contrato)
+  kind      String // TCLE | CONTRATO | OUTRO
+  title     String
+  body      String
+  version   Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  acceptances DocumentAcceptance[]
+
+  @@unique([clinicId, key, version])
+  @@index([clinicId, active])
+}
+
+model DocumentAcceptance {
+  id             String   @id @default(cuid())
+  clinicId       String
+  patientId      String
+  documentId     String
+  method         String // PORTAL | PRESENCIAL
+  acceptedByName String
+  relation       String? // "próprio" ou parentesco do responsável
+  ip             String?
+  acceptedAt     DateTime @default(now())
+
+  document ClinicDocument @relation(fields: [documentId], references: [id])
+
+  @@unique([patientId, documentId])
+  @@index([clinicId, patientId])
+}

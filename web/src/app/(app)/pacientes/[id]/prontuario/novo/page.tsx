@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { localDate, localTime } from "@/lib/agenda";
 import { canAccessPatient, MAX_RECORD_CHARS, RECORD_TYPE_LABEL, requireClinician } from "@/lib/clinical";
 import { DEFAULT_TEMPLATES, fillTemplate } from "@/lib/record-templates";
+import { decryptField } from "@/lib/crypto";
 import { RecordForm, type TemplateOption } from "./record-form";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default async function NewRecordPage({
   const sp = await searchParams;
   if (!(await canAccessPatient(user.clinicId, professionalId, id))) notFound();
 
+  const activePlan = await db.therapyPlan.findFirst({ where: { clinicId: user.clinicId, patientId: id, professionalId, status: "ATIVO" }, include: { goals: { where: { status: "EM_ANDAMENTO" }, orderBy: { createdAt: "asc" } } } });
   const [appointments, patient, clinic, professional, mine] = await Promise.all([
     db.appointment.findMany({
       where: { clinicId: user.clinicId, patientId: id, professionalId, status: { not: "CANCELADA" } },
@@ -58,6 +60,14 @@ export default async function NewRecordPage({
         <Link href="/prontuario/modelos" className="text-sm text-emerald-700 underline">Gerenciar modelos</Link>
       </div>
       {sp.erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{sp.erro}</p>}
+      {activePlan && activePlan.goals.length > 0 && (
+        <details className="rounded-xl border bg-white p-3 text-sm">
+          <summary className="cursor-pointer font-medium">Metas do plano terapêutico ({activePlan.goals.length})</summary>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-zinc-700">
+            {activePlan.goals.map((g) => <li key={g.id}>{decryptField(g.textEnc)} <span className="text-xs text-zinc-500">({g.progress}%)</span></li>)}
+          </ul>
+        </details>
+      )}
       <RecordForm
         patientId={id}
         typeLabels={RECORD_TYPE_LABEL}

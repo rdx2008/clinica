@@ -17,6 +17,7 @@ import {
 } from "@/app/actions/patients";
 import { anonymizePatientAction } from "@/app/actions/patients-admin";
 import { PortalLink } from "./portal-link";
+import { acceptTermInPersonAction } from "@/app/actions/terms";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,11 @@ export default async function PatientPage({
     canFinance ? db.charge.findMany({ where: { patientId: id, clinicId: user.clinicId }, orderBy: { dueDate: "desc" }, take: 100 }) : [],
   ]);
 
+  const [termDocs, termAcc] = await Promise.all([
+    db.clinicDocument.findMany({ where: { clinicId: user.clinicId, active: true }, orderBy: { createdAt: "asc" } }),
+    db.documentAcceptance.findMany({ where: { clinicId: user.clinicId, patientId: id } }),
+  ]);
+  const pendingTermsCount = termDocs.filter((d) => !termAcc.some((a) => a.documentId === d.id)).length;
   const cpf = p.cpfEnc ? maskCpf(decryptField(p.cpfEnc)) : null;
   const optinActive = p.consents.some((c) => c.type === "WHATSAPP_OPTIN" && !c.revokedAt);
   const age = p.birthDate ? ageYears(p.birthDate) : null;
@@ -127,6 +133,7 @@ export default async function PatientPage({
             <Link href={`/agenda/novo?patient=${p.id}`} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">Agendar</Link>
           )}
           {user.role === "PROFISSIONAL" && <Link href={`/pacientes/${p.id}/prontuario`} className="rounded border px-3 py-2 text-sm">Prontuário</Link>}
+          {pendingTermsCount > 0 && <Link href={`/pacientes/${p.id}?aba=dados`} className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900">{pendingTermsCount} termo(s) pendente(s)</Link>}
           {user.role !== "PROFISSIONAL" && p.phoneE164 && optinActive && <Link href={`/whatsapp/nova?patient=${p.id}`} className="rounded border px-3 py-2 text-sm">WhatsApp</Link>}
           <Link href={`/pacientes/${p.id}/editar`} className="rounded border px-3 py-2 text-sm">Editar</Link>
           <form action={setPatientStatusAction}>
@@ -346,6 +353,43 @@ export default async function PatientPage({
               <PortalLink patientId={p.id} />
             </section>
           )}
+
+          <section className="space-y-3 rounded border p-4">
+            <h2>Termos e contratos</h2>
+            {termDocs.length === 0 ? (
+              <p className="text-sm text-zinc-500">Nenhum termo publicado. {user.role === "ADMIN" ? <Link href="/configuracoes/termos" className="underline">Criar termos</Link> : "O administrador pode publicá-los em Configurações."}</p>
+            ) : (
+              <ul className="divide-y text-sm">
+                {termDocs.map((d) => {
+                  const a = termAcc.find((x) => x.documentId === d.id);
+                  return (
+                    <li key={d.id} className="space-y-2 py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{d.title} <span className="text-xs text-zinc-500">(v{d.version})</span></span>
+                        <span className="flex items-center gap-2">
+                          {a ? (
+                            <span className="rounded bg-emerald-100 px-2 py-0.5 text-xs text-emerald-800">Aceito em {a.acceptedAt.toLocaleDateString("pt-BR")} · {a.method === "PORTAL" ? "portal" : "presencial"} · {a.acceptedByName}</span>
+                          ) : (
+                            <span className="rounded bg-amber-100 px-2 py-0.5 text-xs text-amber-800">Pendente</span>
+                          )}
+                          <Link href={`/pacientes/${p.id}/termos/${d.id}/imprimir`} target="_blank" className={btn}>Imprimir</Link>
+                        </span>
+                      </div>
+                      {!a && (
+                        <form action={acceptTermInPersonAction} className="flex flex-wrap items-center gap-2 text-xs">
+                          <input type="hidden" name="patientId" value={p.id} />
+                          <input type="hidden" name="docId" value={d.id} />
+                          <input name="name" required placeholder="Nome de quem assinou" className={input} />
+                          <select name="relation" className={input}><option value="próprio">O próprio paciente</option><option value="responsável legal">Responsável legal</option></select>
+                          <button className={btn}>Registrar aceite presencial</button>
+                        </form>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
           <section className="space-y-3 rounded border p-4">
             <h2>Dados do titular (LGPD)</h2>

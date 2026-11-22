@@ -53,6 +53,7 @@ export async function chargeFromAppointmentAction(formData: FormData) {
   const detail = (m: string): never => redirect(`/agenda/${id}?erro=${encodeURIComponent(m)}`);
 
   if (a.packageId) return detail("Este atendimento foi coberto por um pacote de sessões.");
+  if (a.patientInsuranceId) return detail("Atendimento pelo convênio: o valor a receber é gerado ao marcar \"Compareceu\" (Financeiro → Convênios).");
   const existing = await db.charge.findFirst({ where: { appointmentId: id, status: { not: "CANCELADA" } }, select: { id: true } });
   if (existing) return detail("Este atendimento já tem uma cobrança.");
   if (a.service.priceCents <= 0) return detail("O serviço não tem valor definido.");

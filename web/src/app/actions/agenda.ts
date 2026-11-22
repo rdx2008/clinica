@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { parseBRL } from "@/lib/money";
+import { checkAuth, expectedPayDate } from "@/lib/insurance-core";
 import { ACTIVE_STATUSES, localDate, withinAvailability, parseLocal, validMeetingUrl, weeklyOccurrences, MAX_RECURRENCE } from "@/lib/agenda";
 
 export type AppointmentFormState = { error?: string };
@@ -52,8 +53,11 @@ const createSchema = z.object({
   repeat: z.coerce.number().int().min(1).max(MAX_RECURRENCE).default(1),
   meetingUrl: z.string().trim().optional(),
   roomId: z.string().optional(),
+  insuranceId: z.string().optional(),
   idempotencyKey: z.string().min(8).max(100),
 });
+
+const HOLDS_SESSION = ["AGENDADA", "CONFIRMADA", "COMPARECEU"] as const;
 
 export async function createAppointmentAction(_prev: AppointmentFormState, formData: FormData): Promise<AppointmentFormState> {
   const user = await requireRole(...ALLOWED);
@@ -104,6 +108,35 @@ export async function createAppointmentAction(_prev: AppointmentFormState, formD
     return { error: d.repeat > 1 ? `${CONFLICT} Nenhuma sessão da série foi criada.` : CONFLICT };
   }
 
+  // Atendimento pelo convênio: carteirinha válida, valor do serviço na tabela e autorização com sessões.
+  let patientInsuranceId: string | null = null;
+  let authorizationId: string | null = null;
+  if (d.insuranceId) {
+    const ins = await db.patientInsurance.findFirst({
+      where: { id: d.insuranceId, clinicId: user.clinicId, patientId: patient.id, active: true },
+      include: { insurer: true, authorizations: { orderBy: { createdAt: "asc" } } },
+    });
+    if (!ins || !ins.insurer.active) return { error: "Carteirinha do convênio não encontrada ou inativa." };
+    const last = occurrences[occurrences.length - 1].startsAt;
+    if (ins.validUntil && ins.validUntil.getTime() < last.getTime()) return { error: "A carteirinha vence antes da última sessão. Atualize a validade ou agende como particular." };
+    const price = await db.insurerPrice.findUnique({ where: { insurerId_serviceId: { insurerId: ins.insurerId, serviceId: service.id } }, select: { id: true } });
+    if (!price) return { error: `O convênio ${ins.insurer.name} não tem valor definido para este serviço (Financeiro → Convênios).` };
+    if (ins.authorizations.length > 0) {
+      let reason = "";
+      for (const a of ins.authorizations) {
+        const used = await db.appointment.count({ where: { authorizationId: a.id, status: { in: [...HOLDS_SESSION] } } });
+        const check = checkAuth(a, used, last);
+        if (check.ok && check.remaining >= occurrences.length) {
+          authorizationId = a.id;
+          break;
+        }
+        reason = check.ok ? `A autorização ${a.code} tem só ${check.remaining} sessão(ões) e a série tem ${occurrences.length}.` : check.reason;
+      }
+      if (!authorizationId) return { error: `${reason} Cadastre uma nova autorização na ficha do paciente.` };
+    }
+    patientInsuranceId = ins.id;
+  }
+
   // Reenvio do mesmo formulário (duplo clique, retry): a chave de idempotência evita duplicar.
   const already = await db.appointment.findUnique({ where: { idempotencyKey: `${d.idempotencyKey}-0` }, select: { id: true } });
   if (already) redirect(`/agenda?date=${d.date}&prof=${professional.id}`);
@@ -124,6 +157,8 @@ export async function createAppointmentAction(_prev: AppointmentFormState, formD
             roomId,
             source: "MANUAL",
             meetingUrl,
+            patientInsuranceId,
+            authorizationId,
             idempotencyKey: `${d.idempotencyKey}-${i}`,
           },
         });
@@ -172,7 +207,7 @@ export async function setStatusAction(formData: FormData) {
     await db.$transaction(async (tx) => {
       let packageId = a.packageId;
       // Pacote de sessões: comparecer consome uma sessão; desfazer devolve.
-      if (status === "COMPARECEU" && !packageId) {
+      if (status === "COMPARECEU" && !packageId && !a.patientInsuranceId) {
         const pkgs = await tx.package.findMany({ where: { patientId: a.patientId, serviceId: a.serviceId, clinicId: user.clinicId }, orderBy: { createdAt: "asc" } });
         const open = pkgs.find((p) => p.sessionsUsed < p.sessionsTotal);
         if (open) {
@@ -192,6 +227,27 @@ export async function setStatusAction(formData: FormData) {
           cancelledAt: status === "CANCELADA" ? new Date() : null,
         },
       });
+      // Convênio: comparecer gera o valor a receber; qualquer outro status desfaz o que ainda não foi recebido.
+      if (a.patientInsuranceId) {
+        if (status === "COMPARECEU") {
+          const ins = await tx.patientInsurance.findUnique({ where: { id: a.patientInsuranceId }, include: { insurer: true } });
+          const price = ins ? await tx.insurerPrice.findUnique({ where: { insurerId_serviceId: { insurerId: ins.insurerId, serviceId: a.serviceId } } }) : null;
+          if (ins && price) {
+            const date = localDate(a.startsAt);
+            const data = { amountCents: price.priceCents, expectedDate: expectedPayDate(date, ins.insurer.paymentDays) };
+            const existing = await tx.insuranceEntry.findUnique({ where: { appointmentId: id } });
+            if (!existing) {
+              await tx.insuranceEntry.create({
+                data: { clinicId: user.clinicId, insurerId: ins.insurerId, patientId: a.patientId, professionalId: a.professionalId, appointmentId: id, serviceDate: new Date(`${date}T00:00:00.000Z`), competence: date.slice(0, 7), ...data },
+              });
+            } else if (existing.status !== "PAGO") {
+              await tx.insuranceEntry.update({ where: { id: existing.id }, data: { ...data, status: "A_FATURAR" } });
+            }
+          }
+        } else {
+          await tx.insuranceEntry.updateMany({ where: { appointmentId: id, status: "A_FATURAR" }, data: { status: "CANCELADO" } });
+        }
+      }
     });
   } catch (e) {
     if (isOverlapError(e)) backToDetail(id, CONFLICT);
@@ -222,6 +278,7 @@ export async function rescheduleAction(formData: FormData) {
       ...(a.packageId ? [db.package.update({ where: { id: a.packageId }, data: { sessionsUsed: { decrement: 1 } } })] : []),
       // Novo horário: libera os lembretes já enviados para serem reenviados.
       db.automationRun.deleteMany({ where: { appointmentId: id } }),
+      db.insuranceEntry.updateMany({ where: { appointmentId: id, status: "A_FATURAR" }, data: { status: "CANCELADO" } }),
     ]);
   } catch (e) {
     if (isOverlapError(e)) backToDetail(id, CONFLICT);

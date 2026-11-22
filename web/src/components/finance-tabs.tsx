@@ -4,6 +4,7 @@ const TABS = [
   ["/financeiro", "Cobranças"],
   ["/financeiro/despesas", "Despesas"],
   ["/financeiro/pacotes", "Pacotes"],
+  ["/financeiro/convenios", "Convênios"],
   ["/financeiro/repasses", "Repasses"],
 ] as const;
 

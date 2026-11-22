@@ -21,6 +21,7 @@ function pagesFor(role: string): SearchHit[] {
     { label: "Relatórios", href: "/relatorios", roles: ["ADMIN"] },
     { label: "Despesas", href: "/financeiro/despesas", roles: ["ADMIN", "FINANCEIRO"] },
     { label: "Pacotes de sessões", href: "/financeiro/pacotes", roles: ["ADMIN", "FINANCEIRO", "RECEPCAO"] },
+    { label: "Convênios", href: "/financeiro/convenios", roles: ["ADMIN", "FINANCEIRO"] },
     { label: "Repasses", href: "/financeiro/repasses", roles: ["ADMIN", "FINANCEIRO"] },
     { label: "Importar pacientes", href: "/pacientes/importar", roles: ["ADMIN", "RECEPCAO"] },
     { label: "Termos e contratos", href: "/configuracoes/termos", roles: ["ADMIN"] },

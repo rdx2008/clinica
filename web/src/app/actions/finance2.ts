@@ -6,7 +6,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { parseBRL, shareOf, validMonth } from "@/lib/money";
+import { parseBRL, validMonth } from "@/lib/money";
+import { payoutFigures } from "@/lib/payout";
 import { localDate } from "@/lib/agenda";
 
 const ROLES = ["ADMIN", "FINANCEIRO", "RECEPCAO"] as const;
@@ -138,10 +139,10 @@ export async function closePayoutAction(formData: FormData) {
   const prof = await db.professional.findFirst({ where: { id: professionalId, clinicId: user.clinicId } });
   if (!prof) redirect("/financeiro/repasses");
 
-  const gross = await grossForProfessional(user.clinicId, professionalId, mes);
+  const fig = (await payoutFigures(user.clinicId, [{ id: prof.id, sharePercent: prof.sharePercent }], mes)).get(prof.id);
   try {
     await db.payout.create({
-      data: { clinicId: user.clinicId, professionalId, period: mes, grossCents: gross, shareCents: shareOf(gross, prof.sharePercent) },
+      data: { clinicId: user.clinicId, professionalId, period: mes, grossCents: fig?.grossCents ?? 0, shareCents: fig?.shareCents ?? 0 },
     });
   } catch {
     redirect(`/financeiro/repasses?mes=${mes}&erro=${encodeURIComponent("Esse repasse já foi fechado.")}`);
@@ -158,15 +159,6 @@ export async function payPayoutAction(formData: FormData) {
   await db.payout.update({ where: { id }, data: { status: "PAGO", paidAt: new Date() } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "REPASSE_PAGO", entity: "Payout", entityId: id });
   redirect(`/financeiro/repasses?mes=${p.period}`);
-}
-
-// Recebido no mês (cobranças pagas ligadas a atendimentos do profissional).
-async function grossForProfessional(clinicId: string, professionalId: string, mes: string): Promise<number> {
-  const r = await db.charge.aggregate({
-    where: { clinicId, status: "PAGA", competence: mes, appointment: { professionalId } },
-    _sum: { amountCents: true },
-  });
-  return r._sum.amountCents ?? 0;
 }
 
 // ---- Estorno (reabrir cobrança paga) ----

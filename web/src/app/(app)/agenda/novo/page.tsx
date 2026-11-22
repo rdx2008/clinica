@@ -37,6 +37,10 @@ export default async function NewAppointmentPage({
   ]);
 
   const list = preset && !patients.some((p) => p.id === preset.id) ? [preset, ...patients] : patients;
+  const plans = await db.patientInsurance.findMany({
+    where: { clinicId: user.clinicId, active: true, insurer: { active: true }, patientId: { in: list.map((p) => p.id) } },
+    include: { insurer: { select: { name: true } } },
+  });
   const date = sp.date ?? localDate(new Date());
 
   return (
@@ -72,6 +76,7 @@ export default async function NewAppointmentPage({
             patientId: preset?.id ?? "",
           }}
           rooms={rooms}
+          insurances={plans.map((i) => ({ id: i.id, patientId: i.patientId, label: i.planName ? `${i.insurer.name} (${i.planName})` : i.insurer.name }))}
           idempotencyKey={randomUUID()}
           lockProfessional={user.role === "PROFISSIONAL"}
         />

@@ -138,6 +138,8 @@ export async function anonymizePatientAction(formData: FormData) {
     }),
     db.guardian.deleteMany({ where: { patientId: id } }),
     db.authorizedContact.deleteMany({ where: { patientId: id } }),
+    // Número da carteirinha é dado pessoal: apaga o número e inativa (o histórico financeiro permanece).
+    db.patientInsurance.updateMany({ where: { patientId: id }, data: { cardEnc: encryptField("removido"), planName: null, active: false } }),
     db.consent.updateMany({ where: { patientId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
     db.waitlistEntry.updateMany({ where: { patientId: id, status: "ABERTA" }, data: { status: "REMOVIDA" } }),
   ]);
@@ -174,6 +176,8 @@ export async function mergePatientsAction(formData: FormData) {
     db.guardian.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.authorizedContact.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.contactPreference.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.patientInsurance.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.insuranceEntry.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.scaleAssignment.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.therapyPlan.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.documentAcceptance.deleteMany({ where: { patientId: dropId, documentId: { in: (await db.documentAcceptance.findMany({ where: { patientId: keepId }, select: { documentId: true } })).map((a) => a.documentId) } } }),

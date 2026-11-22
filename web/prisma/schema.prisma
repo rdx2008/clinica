@@ -302,6 +302,8 @@ model Appointment {
   cancelReason   String?
   cancelledAt    DateTime?
   packageId      String?
+  patientInsuranceId String? // atendimento pelo convênio
+  authorizationId    String? // autorização usada
   createdAt      DateTime          @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
@@ -311,6 +313,9 @@ model Appointment {
   room         Room?         @relation(fields: [roomId], references: [id])
   recurrence   Recurrence?   @relation(fields: [recurrenceId], references: [id])
   package      Package?      @relation(fields: [packageId], references: [id])
+  patientInsurance PatientInsurance? @relation(fields: [patientInsuranceId], references: [id])
+  authorization    InsuranceAuth?    @relation(fields: [authorizationId], references: [id])
+  insuranceEntry   InsuranceEntry?
   records      ClinicalRecord[]
   charges      Charge[]
   runs         AutomationRun[]
@@ -787,4 +792,96 @@ model DocumentAcceptance {
 
   @@unique([patientId, documentId])
   @@index([clinicId, patientId])
+}
+
+// ---- Convênios (planos de saúde) ----
+
+model Insurer {
+  id           String   @id @default(cuid())
+  clinicId     String
+  name         String
+  cnpj         String?
+  paymentDays  Int      @default(30) // prazo médio de pagamento (dias após o atendimento)
+  sharePercent Int? // % de repasse do profissional neste convênio (null = usa o do profissional)
+  active       Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  prices  InsurerPrice[]
+  plans   PatientInsurance[]
+  entries InsuranceEntry[]
+
+  @@unique([clinicId, name])
+}
+
+// Tabela de valores: quanto o convênio paga por serviço.
+model InsurerPrice {
+  id         String @id @default(cuid())
+  insurerId  String
+  serviceId  String
+  priceCents Int
+
+  insurer Insurer @relation(fields: [insurerId], references: [id], onDelete: Cascade)
+
+  @@unique([insurerId, serviceId])
+}
+
+// Carteirinha do paciente em um convênio.
+model PatientInsurance {
+  id         String    @id @default(cuid())
+  clinicId   String
+  patientId  String
+  insurerId  String
+  planName   String?
+  cardEnc    String // número da carteirinha (criptografado)
+  validUntil DateTime?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  insurer        Insurer         @relation(fields: [insurerId], references: [id])
+  authorizations InsuranceAuth[]
+  appointments   Appointment[]
+
+  @@index([clinicId, patientId])
+}
+
+// Autorização (guia/senha) com limite de sessões.
+model InsuranceAuth {
+  id                 String    @id @default(cuid())
+  clinicId           String
+  patientInsuranceId String
+  code               String
+  sessionsTotal      Int
+  validUntil         DateTime?
+  createdAt          DateTime  @default(now())
+
+  patientInsurance PatientInsurance @relation(fields: [patientInsuranceId], references: [id], onDelete: Cascade)
+  appointments     Appointment[]
+
+  @@index([patientInsuranceId])
+}
+
+// Valor a receber do convênio por atendimento realizado (uma linha por atendimento).
+model InsuranceEntry {
+  id             String    @id @default(cuid())
+  clinicId       String
+  insurerId      String
+  patientId      String
+  professionalId String
+  appointmentId  String    @unique
+  amountCents    Int
+  serviceDate    DateTime
+  competence     String // AAAA-MM do atendimento
+  expectedDate   DateTime // previsão de pagamento
+  status         String    @default("A_FATURAR") // A_FATURAR | PAGO | CANCELADO (faturado/glosado entram na fase 2/3)
+  paidAt         DateTime?
+  paymentMonth   String? // AAAA-MM do recebimento (base do repasse)
+  createdAt      DateTime  @default(now())
+
+  insurer     Insurer     @relation(fields: [insurerId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+
+  @@index([clinicId, competence])
+  @@index([clinicId, status])
+  @@index([professionalId, paymentMonth])
 }

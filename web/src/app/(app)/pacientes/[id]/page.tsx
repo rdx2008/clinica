@@ -132,6 +132,7 @@ export default async function PatientPage({
           {p.status === "ATIVO" && (
             <Link href={`/agenda/novo?patient=${p.id}`} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">Agendar</Link>
           )}
+          {user.role !== "PROFISSIONAL" && <Link href={`/pacientes/${p.id}/convenios`} className="rounded border px-3 py-2 text-sm">Convênios</Link>}
           {user.role === "PROFISSIONAL" && <Link href={`/pacientes/${p.id}/prontuario`} className="rounded border px-3 py-2 text-sm">Prontuário</Link>}
           {pendingTermsCount > 0 && <Link href={`/pacientes/${p.id}?aba=dados`} className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900">{pendingTermsCount} termo(s) pendente(s)</Link>}
           {user.role !== "PROFISSIONAL" && p.phoneE164 && optinActive && <Link href={`/whatsapp/nova?patient=${p.id}`} className="rounded border px-3 py-2 text-sm">WhatsApp</Link>}

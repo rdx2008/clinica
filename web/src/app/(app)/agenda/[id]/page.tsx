@@ -30,6 +30,9 @@ export default async function AppointmentPage({
       patient: { select: { id: true, fullName: true, phoneE164: true } },
       service: true,
       professional: { include: { user: { select: { name: true } } } },
+      patientInsurance: { include: { insurer: { select: { name: true } } } },
+      authorization: { select: { code: true } },
+      insuranceEntry: { select: { amountCents: true, status: true } },
     },
   });
   if (!a) notFound();
@@ -54,7 +57,17 @@ export default async function AppointmentPage({
         <p><span className="text-zinc-500">Serviço:</span> {a.service.name} ({online ? "online" : "presencial"})</p>
         <p><span className="text-zinc-500">Telefone:</span> {a.patient.phoneE164 ? formatPhoneBR(a.patient.phoneE164) : "—"}</p>
         <p><Link href={`/pacientes/${a.patient.id}`} className="underline">Ver ficha do paciente</Link></p>
-        {user.role !== "PROFISSIONAL" && (
+        {a.patientInsurance && (
+          <p className="sm:col-span-2">
+            <span className="text-zinc-500">Convênio:</span> {a.patientInsurance.insurer.name}
+            {a.patientInsurance.planName ? ` (${a.patientInsurance.planName})` : ""}
+            {a.authorization ? ` · autorização ${a.authorization.code}` : ""}
+            {a.insuranceEntry && a.insuranceEntry.status !== "CANCELADO" && (
+              <> · {a.insuranceEntry.status === "PAGO" ? "recebido" : "a receber"}: <strong>{formatBRL(a.insuranceEntry.amountCents)}</strong></>
+            )}
+          </p>
+        )}
+        {user.role !== "PROFISSIONAL" && !a.patientInsurance && (
           <form action={chargeFromAppointmentAction}>
             <input type="hidden" name="id" value={a.id} />
             <button className="underline">Gerar cobrança ({formatBRL(a.service.priceCents)})</button>

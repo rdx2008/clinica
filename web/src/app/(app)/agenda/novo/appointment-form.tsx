@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import type { AppointmentFormState } from "@/app/actions/agenda";
 
 const input = "w-full rounded border px-3 py-2 text-sm";
@@ -11,10 +11,12 @@ export function AppointmentForm({
   professionals,
   services,
   rooms,
+  insurances,
   defaults,
   idempotencyKey,
   lockProfessional,
 }: {
+  insurances: { id: string; patientId: string; label: string }[];
   action: (prev: AppointmentFormState, fd: FormData) => Promise<AppointmentFormState>;
   patients: { id: string; fullName: string }[];
   professionals: { id: string; name: string }[];
@@ -25,17 +27,27 @@ export function AppointmentForm({
   lockProfessional: boolean;
 }) {
   const [state, formAction, pending] = useActionState(action, {});
+  const [patientId, setPatientId] = useState(defaults.patientId);
+  const options = insurances.filter((i) => i.patientId === patientId);
   return (
     <form action={formAction} className="space-y-3">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {state.error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{state.error}</p>}
 
       <label className="block text-sm">Paciente
-        <select name="patientId" required defaultValue={defaults.patientId} className={input}>
+        <select name="patientId" required value={patientId} onChange={(e) => setPatientId(e.target.value)} className={input}>
           <option value="" disabled>Selecione…</option>
           {patients.map((p) => <option key={p.id} value={p.id}>{p.fullName}</option>)}
         </select>
       </label>
+      {options.length > 0 && (
+        <label className="block text-sm">Forma de atendimento
+          <select name="insuranceId" key={patientId} defaultValue="" className={input}>
+            <option value="">Particular</option>
+            {options.map((i) => <option key={i.id} value={i.id}>Convênio: {i.label}</option>)}
+          </select>
+        </label>
+      )}
       <label className="block text-sm">Profissional
         <select name="professionalId" required defaultValue={defaults.professionalId} disabled={lockProfessional} className={input}>
           {professionals.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}

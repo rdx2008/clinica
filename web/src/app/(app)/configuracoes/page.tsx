@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/session";
 import { formatPhoneBR } from "@/lib/br";
 import { professionalColor } from "@/lib/agenda";
 import { demoExists } from "@/lib/demo";
+import { mailConfigured } from "@/lib/mail";
+import { savePortalSlugAction } from "@/app/actions/portal";
 import { createDemoAction, removeDemoAction } from "@/app/actions/demo";
 import { createRoomAction, removeRoomAction, saveClinicAction, setProfessionalColorAction } from "@/app/actions/settings";
 
@@ -53,6 +55,23 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </div>
         </form>
         <p className="text-xs text-zinc-500">Esses dados aparecem em recibos e documentos impressos.</p>
+      </section>
+
+      <section className="space-y-3 rounded border p-5">
+        <h2>Portal do paciente</h2>
+        <p className="text-sm text-zinc-600">
+          O paciente entra com um link enviado ao e-mail cadastrado e vê consultas, pagamentos (Pix) e recibos. Defina o endereço para ativar.
+        </p>
+        <form action={savePortalSlugAction} className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-zinc-500">/p/</span>
+          <input name="slug" defaultValue={clinic.portalSlug ?? ""} placeholder="nome-da-clinica" className="w-56 rounded border px-3 py-2 text-sm" />
+          <button className="rounded border px-3 py-2 text-sm">Salvar</button>
+        </form>
+        {clinic.portalSlug && <p className="text-xs text-zinc-600">Endereço do portal: <code>/p/{clinic.portalSlug}</code></p>}
+        <p className="text-xs text-zinc-500">
+          Envio de e-mail: <strong>{mailConfigured() ? "configurado" : "não configurado"}</strong>
+          {!mailConfigured() && " (defina SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS e SMTP_FROM no servidor). Enquanto isso, gere o link manualmente na ficha do paciente."}
+        </p>
       </section>
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded border p-5">

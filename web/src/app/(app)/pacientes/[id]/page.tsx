@@ -16,6 +16,7 @@ import {
   setWhatsappOptinAction,
 } from "@/app/actions/patients";
 import { anonymizePatientAction } from "@/app/actions/patients-admin";
+import { PortalLink } from "./portal-link";
 
 export const dynamic = "force-dynamic";
 
@@ -337,6 +338,14 @@ export default async function PatientPage({
               <button className={btn}>Adicionar</button>
             </form>
           </section>
+
+          {user.role !== "PROFISSIONAL" && p.email && (
+            <section className="space-y-2 rounded border p-4">
+              <h2>Portal do paciente</h2>
+              <p className="text-xs text-zinc-500">O paciente acessa consultas, pagamentos (Pix) e recibos com o e-mail cadastrado. Gere um link manual se precisar.</p>
+              <PortalLink patientId={p.id} />
+            </section>
+          )}
 
           <section className="space-y-3 rounded border p-4">
             <h2>Dados do titular (LGPD)</h2>

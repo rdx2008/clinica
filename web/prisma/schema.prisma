@@ -69,6 +69,7 @@ model Clinic {
   id        String   @id @default(cuid())
   name      String
   cnpj      String?
+  portalSlug String? @unique // endereço do portal do paciente (/p/<slug>)
   phone     String?
   email     String?
   address   String?
@@ -684,4 +685,18 @@ model WebhookEvent {
   id         String   @id // id do evento no provedor
   provider   String
   receivedAt DateTime @default(now())
+}
+
+// Link de acesso ao portal do paciente (uso único, curta duração).
+model PortalLink {
+  id        String    @id @default(cuid())
+  clinicId  String
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdBy String? // quando gerado pela equipe
+  createdAt DateTime  @default(now())
+
+  @@index([clinicId, email])
 }

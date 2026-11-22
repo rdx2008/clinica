@@ -40,10 +40,18 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           { href: "/auditoria", label: "Auditoria", icon: "shield" },
         ]
       : [];
+  const clinical: NavItem[] =
+    r === "PROFISSIONAL"
+      ? [
+          { href: "/prontuario/compartilhados", label: "Compartilhados comigo", icon: "share" },
+          { href: "/prontuario/modelos", label: "Modelos de registro", icon: "file" },
+        ]
+      : [];
   const account: NavItem[] = [{ href: "/conta/seguranca", label: "Segurança", icon: "key" }];
   const groups: NavGroup[] = (
     [
       { items: main },
+      { title: "Prontuário", items: clinical },
       { title: "Operação", items: ops },
       { title: "Administração", items: admin },
       { title: "Minha conta", items: account },
@@ -86,7 +94,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen">
       {/* barra lateral (telas grandes) */}
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-emerald-900 px-3 py-4 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-emerald-900 px-3 py-4 lg:flex print:!hidden">
         <div className="px-2 pb-2">{brand}</div>
         <div className="mt-2 px-1"><CommandPalette /></div>
         <div className="mt-2 flex-1 overflow-y-auto pr-1">
@@ -97,7 +105,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* barra superior (celular/tablet) */}
-        <header className="sticky top-0 z-30 border-b border-white/10 bg-emerald-900 lg:hidden">
+        <header className="sticky top-0 z-30 border-b border-white/10 bg-emerald-900 lg:hidden print:!hidden">
           <details className="group">
             <summary className="flex cursor-pointer items-center justify-between gap-3 px-4 py-3 [&::before]:hidden">
               {brand}

@@ -92,6 +92,7 @@ model Clinic {
   packages      Package[]
   payouts       Payout[]
   waitlist      WaitlistEntry[]
+  recordTemplates RecordTemplate[]
   auditLogs     AuditLog[]
   importJobs    ImportJob[]
 }
@@ -361,8 +362,12 @@ model ClinicalAccessGrant {
   purpose   String
   grantedBy String
   expiresAt DateTime?
+  createdAt DateTime  @default(now())
 
   record ClinicalRecord @relation(fields: [recordId], references: [id])
+
+  @@index([granteeId])
+  @@index([recordId])
 }
 
 model WaAccount {
@@ -551,4 +556,19 @@ model WaitlistEntry {
   patient Patient @relation(fields: [patientId], references: [id])
 
   @@index([clinicId, status])
+}
+
+// Modelos de registro/documento (texto-base com variáveis). professionalId nulo = modelo da clínica.
+model RecordTemplate {
+  id             String   @id @default(cuid())
+  clinicId       String
+  professionalId String?
+  name           String
+  type           RecordType
+  content        String
+  createdAt      DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId])
 }

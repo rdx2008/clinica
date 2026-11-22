@@ -101,3 +101,69 @@ export async function deleteDraftAction(formData: FormData) {
   await audit({ clinicId: user.clinicId, userId: user.id, action: "PRONTUARIO_RASCUNHO_EXCLUIDO", entity: "ClinicalRecord", entityId: id });
   redirect(`/pacientes/${rec.patientId}/prontuario`);
 }
+
+// ---- Modelos de registro do profissional ----
+
+const templateSchema = z.object({
+  name: z.string().trim().min(3, "Dê um nome ao modelo").max(80),
+  type: z.string().refine((t) => RECORD_TYPES.includes(t), "Tipo inválido"),
+  content: z.string().trim().min(10, "Escreva o texto do modelo").max(MAX_RECORD_CHARS),
+});
+
+export async function createTemplateAction(formData: FormData) {
+  const { user, professionalId } = await requireClinician();
+  const parsed = templateSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) fail("/prontuario/modelos", parsed.error.issues[0].message);
+  const t = await db.recordTemplate.create({
+    data: { clinicId: user.clinicId, professionalId, name: parsed.data.name, type: parsed.data.type as RecordType, content: parsed.data.content },
+  });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "MODELO_PRONTUARIO_CRIADO", entity: "RecordTemplate", entityId: t.id });
+  redirect("/prontuario/modelos");
+}
+
+export async function deleteTemplateAction(formData: FormData) {
+  const { user, professionalId } = await requireClinician();
+  const id = String(formData.get("id") ?? "");
+  const r = await db.recordTemplate.deleteMany({ where: { id, clinicId: user.clinicId, professionalId } });
+  if (r.count) await audit({ clinicId: user.clinicId, userId: user.id, action: "MODELO_PRONTUARIO_REMOVIDO", entity: "RecordTemplate", entityId: id });
+  redirect("/prontuario/modelos");
+}
+
+// ---- Compartilhamento de um registro com outro profissional (com finalidade e prazo) ----
+
+const GRANT_DAYS = [7, 30, 90, 180];
+
+export async function grantAccessAction(formData: FormData) {
+  const { user, professionalId } = await requireClinician();
+  const recordId = String(formData.get("recordId") ?? "");
+  const rec = await ownRecord(user.clinicId, professionalId, recordId);
+  if (!rec) redirect("/pacientes");
+  const path = `/pacientes/${rec.patientId}/prontuario/${rec.id}`;
+
+  if (rec.type === "ANOTACAO_PESSOAL") fail(path, "Anotações pessoais não podem ser compartilhadas.");
+  const granteeId = String(formData.get("granteeId") ?? "");
+  const purpose = String(formData.get("purpose") ?? "").trim();
+  const days = Number(formData.get("days"));
+  if (purpose.length < 5) fail(path, "Informe a finalidade do compartilhamento (mínimo 5 caracteres).");
+  if (!GRANT_DAYS.includes(days)) fail(path, "Prazo inválido.");
+  if (granteeId === professionalId) fail(path, "Selecione outro profissional.");
+  const grantee = await db.professional.findFirst({ where: { id: granteeId, clinicId: user.clinicId, user: { active: true } }, select: { id: true } });
+  if (!grantee) fail(path, "Profissional não encontrado.");
+
+  const g = await db.clinicalAccessGrant.create({
+    data: { recordId, granteeId, purpose: purpose.slice(0, 200), grantedBy: user.id, expiresAt: new Date(Date.now() + days * 86400_000) },
+  });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "PRONTUARIO_COMPARTILHADO", entity: "ClinicalRecord", entityId: rec.id });
+  void g;
+  redirect(path);
+}
+
+export async function revokeGrantAction(formData: FormData) {
+  const { user, professionalId } = await requireClinician();
+  const grantId = String(formData.get("grantId") ?? "");
+  const grant = await db.clinicalAccessGrant.findUnique({ where: { id: grantId }, include: { record: true } });
+  if (!grant || grant.record.clinicId !== user.clinicId || grant.record.professionalId !== professionalId) redirect("/pacientes");
+  await db.clinicalAccessGrant.delete({ where: { id: grantId } });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "PRONTUARIO_COMPARTILHAMENTO_REVOGADO", entity: "ClinicalRecord", entityId: grant.recordId });
+  redirect(`/pacientes/${grant.record.patientId}/prontuario/${grant.recordId}`);
+}

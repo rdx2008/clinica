@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atendimento ao lado do Meet</title>
+  <style>
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 520px; margin: 32px auto; padding: 0 16px; color: #1d1c19; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p { color: #555; margin: 4px 0 16px; }
+    label { display: block; margin: 12px 0 4px; font-weight: 600; }
+    input[type=url] { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #c9c5b8; border-radius: 6px; font: inherit; }
+    .row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
+    .row label { margin: 0; font-weight: 400; }
+    button { margin-top: 16px; padding: 8px 16px; border: 0; border-radius: 6px; background: #0f6b5d; color: #fff; font: inherit; cursor: pointer; }
+    #msg { margin-top: 12px; min-height: 1.4em; }
+    .ok { color: #166534; } .err { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1>Atendimento ao lado do Meet</h1>
+  <p>Ao abrir o Meet de uma consulta sua, o painel do paciente abre ao lado. A extensão só lê o endereço da aba do Meet.</p>
+  <label for="base">Endereço do sistema da clínica</label>
+  <input id="base" type="url" placeholder="https://sistema.suaclinica.com.br" />
+  <div class="row">
+    <input id="tile" type="checkbox" />
+    <label for="tile">Ajustar a janela do Meet para a esquerda quando o painel abrir</label>
+  </div>
+  <button id="save">Salvar</button>
+  <div id="msg" role="status"></div>
+  <script src="options.js"></script>
+</body>
+</html>

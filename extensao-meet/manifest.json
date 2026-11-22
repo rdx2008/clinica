@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Sistema de Clínicas: atendimento ao lado do Meet",
+  "version": "1.0.0",
+  "description": "Ao abrir o Meet de uma consulta, abre o painel de atendimento do paciente ao lado.",
+  "permissions": ["storage", "system.display"],
+  "host_permissions": ["https://meet.google.com/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "Abrir painel de atendimento" },
+  "options_page": "options.html"
+}

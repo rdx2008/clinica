@@ -170,6 +170,13 @@ model Patient {
   email     String?
   source    String?
   tags      String[]
+  sex       String? // F | M | O
+  occupation String?
+  address   String?
+  emergencyName  String?
+  emergencyPhone String?
+  insurance String? // convênio / plano
+  adminNotes String? // observações administrativas (nunca clínicas)
   status    String   @default("ATIVO")
   dedupeKey String? // hash normalizado (nome + nascimento + telefone)
   createdAt DateTime @default(now())

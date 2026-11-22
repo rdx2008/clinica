@@ -25,6 +25,13 @@ const patientSchema = z.object({
   email: z.string().trim().toLowerCase().email("E-mail inválido").or(z.literal("")).optional(),
   source: z.string().trim().optional(),
   tags: z.string().optional(),
+  sex: z.enum(["F", "M", "O", ""]).optional(),
+  occupation: z.string().trim().max(80).optional(),
+  address: z.string().trim().max(240).optional(),
+  emergencyName: z.string().trim().max(80).optional(),
+  emergencyPhone: z.string().optional(),
+  insurance: z.string().trim().max(80).optional(),
+  adminNotes: z.string().trim().max(500).optional(),
 });
 
 function parseCommon(formData: FormData) {
@@ -46,7 +53,30 @@ function parseCommon(formData: FormData) {
   }
   const tags = (d.tags ?? "").split(",").map((t) => t.trim()).filter(Boolean).slice(0, 10);
 
-  return { value: { fullName: d.fullName, birthDate, cpfDigits, phone, email: d.email || null, source: d.source || null, tags } } as const;
+  let emergencyPhone: string | null = null;
+  if (d.emergencyPhone?.trim()) {
+    emergencyPhone = normalizePhoneBR(d.emergencyPhone);
+    if (!emergencyPhone) return { error: "Telefone do contato de emergência inválido." } as const;
+  }
+
+  return {
+    value: {
+      fullName: d.fullName,
+      birthDate,
+      cpfDigits,
+      phone,
+      email: d.email || null,
+      source: d.source || null,
+      tags,
+      sex: d.sex || null,
+      occupation: d.occupation || null,
+      address: d.address || null,
+      emergencyName: d.emergencyName || null,
+      emergencyPhone,
+      insurance: d.insurance || null,
+      adminNotes: d.adminNotes || null,
+    },
+  } as const;
 }
 
 // Procura possíveis duplicados na mesma clínica: mesmo CPF, mesmo telefone ou mesmo nome + nascimento.
@@ -103,6 +133,13 @@ export async function createPatientAction(_prev: PatientFormState, formData: For
       email: v.email,
       source: v.source,
       tags: v.tags,
+      sex: v.sex,
+      occupation: v.occupation,
+      address: v.address,
+      emergencyName: v.emergencyName,
+      emergencyPhone: v.emergencyPhone,
+      insurance: v.insurance,
+      adminNotes: v.adminNotes,
       consents: {
         create: [
           { type: "TRATAMENTO_DADOS", version: CONSENT_VERSION, channel: "PRESENCIAL" },
@@ -142,6 +179,13 @@ export async function updatePatientAction(_prev: PatientFormState, formData: For
       email: v.email,
       source: v.source,
       tags: v.tags,
+      sex: v.sex,
+      occupation: v.occupation,
+      address: v.address,
+      emergencyName: v.emergencyName,
+      emergencyPhone: v.emergencyPhone,
+      insurance: v.insurance,
+      adminNotes: v.adminNotes,
       // CPF só muda se um novo for informado (o atual nunca volta para o formulário).
       ...(v.cpfDigits ? { cpfEnc: encryptField(v.cpfDigits), dedupeKey: blindIndex(v.cpfDigits) } : {}),
     },

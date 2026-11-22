@@ -16,6 +16,13 @@ type Props = {
     source: string;
     tags: string;
     hasCpf: boolean;
+    sex: string;
+    occupation: string;
+    address: string;
+    emergencyName: string;
+    emergencyPhone: string;
+    insurance: string;
+    adminNotes: string;
   };
 };
 
@@ -53,6 +60,40 @@ export function PatientForm({ action, mode, initial }: Props) {
       <label className="flex flex-col gap-1 text-sm">
         Etiquetas (separadas por vírgula)
         <input name="tags" defaultValue={initial?.tags} className={input} />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm">
+        Sexo
+        <select name="sex" defaultValue={initial?.sex ?? ""} className={input}>
+          <option value="">Não informado</option>
+          <option value="F">Feminino</option>
+          <option value="M">Masculino</option>
+          <option value="O">Outro</option>
+        </select>
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Profissão
+        <input name="occupation" defaultValue={initial?.occupation} className={input} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+        Endereço
+        <input name="address" defaultValue={initial?.address} placeholder="Rua, número, bairro, cidade/UF" className={input} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Contato de emergência (nome)
+        <input name="emergencyName" defaultValue={initial?.emergencyName} className={input} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm">
+        Contato de emergência (telefone)
+        <input name="emergencyPhone" inputMode="tel" defaultValue={initial?.emergencyPhone} className={input} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+        Convênio / plano (se houver)
+        <input name="insurance" defaultValue={initial?.insurance} className={input} />
+      </label>
+      <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+        Observações administrativas (não clínicas)
+        <textarea name="adminNotes" rows={2} defaultValue={initial?.adminNotes} className={input} />
       </label>
 
       {mode === "create" && (

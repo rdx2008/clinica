@@ -27,6 +27,13 @@ export default async function EditPatientPage({ params }: { params: Promise<{ id
           source: p.source ?? "",
           tags: p.tags.join(", "),
           hasCpf: !!p.cpfEnc,
+          sex: p.sex ?? "",
+          occupation: p.occupation ?? "",
+          address: p.address ?? "",
+          emergencyName: p.emergencyName ?? "",
+          emergencyPhone: p.emergencyPhone ? formatPhoneBR(p.emergencyPhone) : "",
+          insurance: p.insurance ?? "",
+          adminNotes: p.adminNotes ?? "",
         }}
       />
     </div>

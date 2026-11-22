@@ -155,3 +155,24 @@ export function layoutLanes(events: { id: string; start: number; end: number }[]
   flush();
   return result;
 }
+
+// ---- Relatórios ----
+
+function hhmmToMin(t: string): number {
+  return Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+}
+
+// Capacidade (minutos) de atendimento nas datas [start, endExclusive) a partir das janelas semanais.
+export function capacityMinutes(windows: Window[], start: string, endExclusive: string): number {
+  let total = 0;
+  for (let d = start; d < endExclusive; d = addDays(d, 1)) {
+    const wd = localWeekday(new Date(`${d}T12:00:00.000${OFFSET}`));
+    for (const w of windows) if (w.weekday === wd) total += Math.max(0, hhmmToMin(w.endTime) - hhmmToMin(w.startTime));
+  }
+  return total;
+}
+
+// Percentual inteiro; null quando não há base de cálculo.
+export function pct(part: number, whole: number): number | null {
+  return whole > 0 ? Math.round((part / whole) * 100) : null;
+}

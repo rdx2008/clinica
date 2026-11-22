@@ -104,3 +104,18 @@ test("faixas: reaproveita faixa livre", () => {
   assert.equal(m.get("a")!.lanes, 2);
   assert.equal(m.get("c")!.lane, 1); // ocupa a faixa que "b" liberou
 });
+
+import { capacityMinutes, pct } from "../src/lib/agenda.ts";
+
+test("relatórios: capacidade semanal somada nos dias do período", () => {
+  // quartas (3) 08:00–12:00 = 240 min; novembro/2026 tem 4 quartas (4, 11, 18, 25)
+  const wins = [{ weekday: 3, startTime: "08:00", endTime: "12:00" }];
+  assert.equal(capacityMinutes(wins, "2026-11-01", "2026-12-01"), 4 * 240);
+  assert.equal(capacityMinutes([], "2026-11-01", "2026-12-01"), 0);
+  assert.equal(capacityMinutes(wins, "2026-11-18", "2026-11-19"), 240);
+});
+
+test("relatórios: percentual", () => {
+  assert.equal(pct(1, 3), 33);
+  assert.equal(pct(5, 0), null);
+});

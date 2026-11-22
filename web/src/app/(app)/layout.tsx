@@ -34,6 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const admin: NavItem[] =
     r === "ADMIN"
       ? [
+          { href: "/relatorios", label: "Relatórios", icon: "chart" },
           { href: "/servicos", label: "Serviços", icon: "list" },
           { href: "/usuarios", label: "Usuários", icon: "stethoscope" },
           { href: "/configuracoes", label: "Configurações", icon: "settings" },

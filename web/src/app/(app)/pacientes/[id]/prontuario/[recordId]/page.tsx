@@ -7,6 +7,7 @@ import { MAX_RECORD_CHARS, RECORD_TYPE_LABEL, requireClinician } from "@/lib/cli
 import { nowPlus } from "@/lib/agenda";
 import { formatBytes } from "@/lib/files";
 import { Attachments } from "./attachments";
+import { SignedDocs, type SignedItem } from "./signed-docs";
 import {
   approveRecordAction,
   deleteDraftAction,
@@ -37,7 +38,7 @@ export default async function RecordPage({
       patient: { select: { fullName: true } },
       professional: { include: { user: { select: { name: true } } } },
       grants: true,
-      attachments: { select: { id: true, name: true, mime: true, size: true }, orderBy: { createdAt: "asc" } },
+      attachments: { select: { id: true, name: true, mime: true, size: true, kind: true, sha256: true, signatureJson: true, createdAt: true }, orderBy: { createdAt: "asc" } },
       _count: { select: { versions: true } },
     },
   });
@@ -56,6 +57,25 @@ export default async function RecordPage({
     entityId: rec.id,
   });
 
+  const signedItems: SignedItem[] = rec.attachments
+    .filter((a) => a.kind === "ASSINADO")
+    .map((a) => {
+      let report: { signatures?: SignedItem["signatures"]; intact?: boolean } = {};
+      try {
+        report = a.signatureJson ? JSON.parse(a.signatureJson) : {};
+      } catch {
+        report = {};
+      }
+      return {
+        id: a.id,
+        name: a.name || "documento.pdf",
+        size: formatBytes(a.size),
+        sha256: a.sha256,
+        when: a.createdAt.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+        intact: report.intact ?? false,
+        signatures: report.signatures ?? [],
+      };
+    });
   const content = decryptField(rec.contentEnc);
   const approved = rec.status === "APROVADO";
   const others = isAuthor
@@ -121,8 +141,10 @@ export default async function RecordPage({
       <Attachments
         recordId={rec.id}
         canEdit={isAuthor && !approved}
-        items={rec.attachments.map((a) => ({ id: a.id, name: a.name || "arquivo", mime: a.mime, size: formatBytes(a.size) }))}
+        items={rec.attachments.filter((a) => a.kind !== "ASSINADO").map((a) => ({ id: a.id, name: a.name || "arquivo", mime: a.mime, size: formatBytes(a.size) }))}
       />
+
+      <SignedDocs recordId={rec.id} canUpload={isAuthor} canRemove={isAuthor && !approved} items={signedItems} />
 
       {isAuthor && rec.type !== "ANOTACAO_PESSOAL" && (
         <section className="space-y-3 rounded border p-4">

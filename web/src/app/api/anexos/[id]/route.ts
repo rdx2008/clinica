@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import { decryptBuffer } from "@/lib/crypto";
 import { getCurrentUser, MFA_REQUIRED } from "@/lib/session";
@@ -31,6 +32,11 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   await audit({ clinicId: user.clinicId, userId: user.id, action: isAuthor ? "ANEXO_BAIXADO" : "ANEXO_BAIXADO_COMPARTILHADO", entity: "ClinicalRecord", entityId: att.record.id });
 
   const body = decryptBuffer(Buffer.from(att.data));
+  // Documento assinado: confere a impressão digital gravada no envio. Se divergir, o arquivo foi alterado.
+  if (att.sha256 && createHash("sha256").update(body).digest("hex") !== att.sha256) {
+    await audit({ clinicId: user.clinicId, userId: user.id, action: "ANEXO_INTEGRIDADE_FALHOU", entity: "ClinicalRecord", entityId: att.record.id });
+    return new Response("O arquivo não confere com a impressão digital registrada.", { status: 409 });
+  }
   const inline = INLINE.includes(att.mime);
   return new Response(new Uint8Array(body), {
     headers: {

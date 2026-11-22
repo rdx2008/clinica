@@ -361,15 +361,18 @@ model ClinicalRecordVersion {
 }
 
 model ClinicalAttachment {
-  id         String   @id @default(cuid())
-  recordId   String
-  fileKey    String
-  mime       String
-  size       Int
-  name       String   @default("")
-  data       Bytes? // conteúdo criptografado (AES-256-GCM)
-  uploadedBy String   @default("")
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  recordId      String
+  fileKey       String
+  mime          String
+  size          Int
+  name          String   @default("")
+  data          Bytes? // conteúdo criptografado (AES-256-GCM)
+  uploadedBy    String   @default("")
+  createdAt     DateTime @default(now())
+  kind          String   @default("ANEXO") // ANEXO | ASSINADO (PDF com assinatura digital, anexado após assinar por fora)
+  sha256        String? // impressão digital do arquivo no momento do envio
+  signatureJson String? // dados lidos das assinaturas do PDF (signatário, emissor, validade)
 
   record ClinicalRecord @relation(fields: [recordId], references: [id])
 }

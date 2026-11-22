@@ -41,17 +41,17 @@ export async function createQuickReplyAction(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const body = String(formData.get("body") ?? "").trim();
   if (title.length < 2 || title.length > 40 || body.length < 2 || body.length > 1000) {
-    redirect(`/whatsapp/respostas?erro=${encodeURIComponent("Informe um título (até 40) e o texto (até 1000 caracteres).")}`);
+    redirect(`/configuracoes/whatsapp/respostas?erro=${encodeURIComponent("Informe um título (até 40) e o texto (até 1000 caracteres).")}`);
   }
   const q = await db.quickReply.create({ data: { clinicId: user.clinicId, title, body } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "RESPOSTA_RAPIDA_CRIADA", entity: "QuickReply", entityId: q.id });
-  redirect("/whatsapp/respostas");
+  redirect("/configuracoes/whatsapp/respostas");
 }
 
 export async function deleteQuickReplyAction(formData: FormData) {
   const user = await requireRole("ADMIN", "RECEPCAO");
   await db.quickReply.deleteMany({ where: { id: String(formData.get("id") ?? ""), clinicId: user.clinicId } });
-  redirect("/whatsapp/respostas");
+  redirect("/configuracoes/whatsapp/respostas");
 }
 
 // ---- Envio manual de modelo aprovado (inicia ou retoma conversa) ----
@@ -123,7 +123,7 @@ export async function sendTemplateManualAction(formData: FormData) {
 export async function syncTemplatesAction() {
   const user = await requireRole("ADMIN");
   const back = (m?: string, ok?: string): never =>
-    redirect(`/whatsapp/automacoes${m ? `?erro=${encodeURIComponent(m)}` : ok ? `?ok=${encodeURIComponent(ok)}` : ""}`);
+    redirect(`/configuracoes/whatsapp/modelos${m ? `?erro=${encodeURIComponent(m)}` : ok ? `?ok=${encodeURIComponent(ok)}` : ""}`);
   const account = await db.waAccount.findFirst({ where: { clinicId: user.clinicId, status: "ATIVA" } });
   if (!account) return back("Configure o WhatsApp antes de sincronizar.");
 

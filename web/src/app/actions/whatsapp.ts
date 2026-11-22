@@ -17,7 +17,7 @@ const accountSchema = z.object({
 
 export async function saveAccountAction(formData: FormData) {
   const user = await requireRole("ADMIN");
-  const back = (m: string): never => redirect(`/whatsapp/config?erro=${encodeURIComponent(m)}`);
+  const back = (m: string): never => redirect(`/configuracoes/whatsapp/conexao?erro=${encodeURIComponent(m)}`);
   const parsed = accountSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return back(parsed.error.issues[0].message);
   const d = parsed.data;
@@ -34,7 +34,7 @@ export async function saveAccountAction(formData: FormData) {
   else await db.waAccount.create({ data: { clinicId: user.clinicId, tokenEnc: encryptField(d.token!), ...data } });
 
   await audit({ clinicId: user.clinicId, userId: user.id, action: "WHATSAPP_CONFIGURADO", entity: "WaAccount", entityId: existing?.id ?? null });
-  redirect("/whatsapp/config?ok=1");
+  redirect("/configuracoes/whatsapp/conexao?ok=1");
 }
 
 export async function sendReplyAction(formData: FormData) {
@@ -81,14 +81,14 @@ const templateSchema = z.object({
 
 export async function createTemplateAction(formData: FormData) {
   const user = await requireRole("ADMIN");
-  const back = (m: string): never => redirect(`/whatsapp/automacoes?erro=${encodeURIComponent(m)}`);
+  const back = (m: string): never => redirect(`/configuracoes/whatsapp/modelos?erro=${encodeURIComponent(m)}`);
   const parsed = templateSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return back(parsed.error.issues[0].message);
   const exists = await db.waTemplate.findFirst({ where: { clinicId: user.clinicId, name: parsed.data.name, language: parsed.data.language } });
   if (exists) return back("Já existe um modelo com esse nome e idioma.");
   const t = await db.waTemplate.create({ data: { clinicId: user.clinicId, ...parsed.data } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "WHATSAPP_MODELO_CRIADO", entity: "WaTemplate", entityId: t.id });
-  redirect("/whatsapp/automacoes");
+  redirect("/configuracoes/whatsapp/modelos");
 }
 
 // A aprovação real é feita pela Meta; aqui o administrador registra o resultado.
@@ -96,15 +96,15 @@ export async function setTemplateStatusAction(formData: FormData) {
   const user = await requireRole("ADMIN");
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "");
-  if (!["PENDENTE", "APROVADO", "REJEITADO"].includes(status)) redirect("/whatsapp/automacoes");
+  if (!["PENDENTE", "APROVADO", "REJEITADO"].includes(status)) redirect("/configuracoes/whatsapp/modelos");
   await db.waTemplate.updateMany({ where: { id, clinicId: user.clinicId }, data: { status } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: `WHATSAPP_MODELO_${status}`, entity: "WaTemplate", entityId: id });
-  redirect("/whatsapp/automacoes");
+  redirect("/configuracoes/whatsapp/modelos");
 }
 
 export async function createAutomationAction(formData: FormData) {
   const user = await requireRole("ADMIN");
-  const back = (m: string): never => redirect(`/whatsapp/automacoes?erro=${encodeURIComponent(m)}`);
+  const back = (m: string): never => redirect(`/configuracoes/whatsapp/modelos?erro=${encodeURIComponent(m)}`);
   const hours = Number(formData.get("hours"));
   if (!Number.isFinite(hours) || hours < 2 || hours > 168) return back("Informe de 2 a 168 horas de antecedência.");
   const template = await db.waTemplate.findFirst({ where: { id: String(formData.get("templateId") ?? ""), clinicId: user.clinicId } });
@@ -113,7 +113,7 @@ export async function createAutomationAction(formData: FormData) {
     data: { clinicId: user.clinicId, trigger: "LEMBRETE", offsetMin: Math.round(hours * 60), templateId: template.id },
   });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "WHATSAPP_AUTOMACAO_CRIADA", entity: "Automation", entityId: a.id });
-  redirect("/whatsapp/automacoes");
+  redirect("/configuracoes/whatsapp/modelos");
 }
 
 export async function toggleAutomationAction(formData: FormData) {
@@ -122,14 +122,14 @@ export async function toggleAutomationAction(formData: FormData) {
   const active = formData.get("active") === "true";
   await db.automation.updateMany({ where: { id, clinicId: user.clinicId }, data: { active } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: active ? "WHATSAPP_AUTOMACAO_LIGADA" : "WHATSAPP_AUTOMACAO_DESLIGADA", entity: "Automation", entityId: id });
-  redirect("/whatsapp/automacoes");
+  redirect("/configuracoes/whatsapp/modelos");
 }
 
 // ---- IA de recepção ----
 
 export async function saveAiConfigAction(formData: FormData) {
   const user = await requireRole("ADMIN");
-  const back = (m: string): never => redirect(`/whatsapp/ia?erro=${encodeURIComponent(m)}`);
+  const back = (m: string): never => redirect(`/configuracoes/whatsapp/ia?erro=${encodeURIComponent(m)}`);
   const info = String(formData.get("info") ?? "").trim();
   const crisis = String(formData.get("crisisMessage") ?? "").trim();
   const handoff = String(formData.get("handoffMessage") ?? "").trim();
@@ -145,7 +145,7 @@ export async function saveAiConfigAction(formData: FormData) {
   };
   await db.aiConfig.upsert({ where: { clinicId: user.clinicId }, create: { clinicId: user.clinicId, ...data }, update: data });
   await audit({ clinicId: user.clinicId, userId: user.id, action: enabled ? "IA_LIGADA" : "IA_DESLIGADA", entity: "AiConfig", entityId: user.clinicId });
-  redirect("/whatsapp/ia?ok=1");
+  redirect("/configuracoes/whatsapp/ia?ok=1");
 }
 
 // Atendente assume ou devolve a conversa para a IA (usado quando a IA de recepção existir).

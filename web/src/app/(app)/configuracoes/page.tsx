@@ -57,6 +57,14 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <p className="text-xs text-zinc-500">Esses dados aparecem em recibos e documentos impressos.</p>
       </section>
 
+      <section className="flex flex-wrap items-center justify-between gap-3 rounded border p-5">
+        <div>
+          <h2>WhatsApp</h2>
+          <p className="text-sm text-zinc-600">Conexão, modelos e lembretes, IA de recepção e respostas rápidas.</p>
+        </div>
+        <a href="/configuracoes/whatsapp" className="rounded border px-4 py-2 text-sm">Configurar</a>
+      </section>
+
       <section className="space-y-3 rounded border p-5">
         <h2>Portal do paciente</h2>
         <p className="text-sm text-zinc-600">

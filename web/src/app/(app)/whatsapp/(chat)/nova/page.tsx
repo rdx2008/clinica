@@ -26,7 +26,7 @@ export default async function NewMessagePage({ searchParams }: { searchParams: P
   const list = preset && !patients.some((p) => p.id === preset.id) ? [preset, ...patients] : patients;
 
   return (
-    <div className="mx-auto max-w-xl space-y-4">
+    <div className="mx-auto max-w-xl space-y-4 p-4 sm:p-6">
       <Link href="/whatsapp" className="text-xs text-zinc-500 underline">← Conversas</Link>
       <div>
         <h1 className="text-2xl">Nova mensagem</h1>
@@ -36,7 +36,7 @@ export default async function NewMessagePage({ searchParams }: { searchParams: P
 
       {templates.length === 0 ? (
         <p className="rounded border p-4 text-sm text-zinc-600">
-          Nenhum modelo aprovado. {user.role === "ADMIN" ? <Link href="/whatsapp/automacoes" className="underline">Cadastre ou sincronize modelos</Link> : "Peça ao administrador."}
+          Nenhum modelo aprovado. {user.role === "ADMIN" ? <Link href="/configuracoes/whatsapp/modelos" className="underline">Cadastre ou sincronize modelos</Link> : "Peça ao administrador."}
         </p>
       ) : (
         <>

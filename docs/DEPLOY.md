@@ -49,7 +49,8 @@ As migrações usam a extensão `btree_gist`. O usuário padrão do Postgres do 
 
 `REDIS_URL` ainda não é usado. Não marque as variáveis acima como "somente build": o app precisa delas em execução.
 
-7. **Deploy.** Ao subir, o container aplica as migrações (`prisma migrate deploy`) e inicia o servidor. Se o deploy falhar, veja o log: o erro mais comum é `DATABASE_URL` incorreta.
+7. **Healthcheck:** na aba *Healthcheck* da aplicação, ative com método GET, porta `3000` e caminho `/api/health`. Assim o Coolify só troca a versão antiga quando a nova está saudável.
+8. **Deploy.** Ao subir, o container aplica as migrações (`prisma migrate deploy`) e inicia o servidor. Se o deploy falhar, veja o log: o erro mais comum é `DATABASE_URL` incorreta.
 
 ## 4. Primeiro acesso
 

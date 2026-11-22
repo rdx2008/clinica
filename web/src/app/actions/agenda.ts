@@ -190,7 +190,7 @@ async function billingLock(appointmentId: string): Promise<string | null> {
   const e = await db.insuranceEntry.findUnique({ where: { appointmentId }, select: { status: true, guideNumber: true } });
   if (!e) return null;
   if (e.status === "FATURADO") return `Atendimento já faturado (guia ${e.guideNumber}). Tire-o do lote em Financeiro → Convênios antes de alterar.`;
-  if (e.status === "PAGO") return "Atendimento já recebido do convênio. Estorne o recebimento em Financeiro → Convênios antes de alterar.";
+  if (e.status !== "A_FATURAR" && e.status !== "CANCELADO") return "Atendimento já teve retorno do convênio (recebimento ou glosa). Estorne em Financeiro → Convênios antes de alterar.";
   return null;
 }
 

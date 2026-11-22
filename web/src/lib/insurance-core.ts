@@ -14,6 +14,12 @@ export function guideNumber(batchNumber: number, seq: number): string {
   return `${batchNumber}-${String(seq).padStart(3, "0")}`;
 }
 
+// Resultado do retorno do convênio para uma guia: pagou tudo ou glosou a diferença.
+export function settle(amountCents: number, paidCents: number): { status: "PAGO" | "GLOSADO"; glossCents: number } | null {
+  if (!Number.isInteger(paidCents) || paidCents < 0 || paidCents > amountCents) return null;
+  return paidCents >= amountCents ? { status: "PAGO", glossCents: 0 } : { status: "GLOSADO", glossCents: amountCents - paidCents };
+}
+
 export type AuthCheck = { ok: true; remaining: number } | { ok: false; reason: string };
 
 // A autorização cobre mais um atendimento na data informada?

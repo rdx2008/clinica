@@ -139,3 +139,31 @@ export async function issueInvoiceForCharge(ctx: AsaasCtx, chargeId: string, cpf
   await asaas(ctx, "POST", `/invoices/${created.data.id}/authorize`);
   return { ok: true, data: inv.id };
 }
+
+// Emite a NFS-e do lote para o convênio (tomador = operadora, pelo CNPJ), sobre o valor efetivamente recebido.
+// Nota avulsa: não depende de cobrança no gateway, pois o convênio paga direto na conta da clínica.
+export async function issueInvoiceForBatch(ctx: AsaasCtx, batchId: string): Promise<Result<string>> {
+  const b = await db.insuranceBatch.findFirst({ where: { id: batchId, clinicId: ctx.clinicId }, include: { insurer: true } });
+  if (!b) return { ok: false, error: "Lote não encontrado." };
+  if (b.invoiceExternalId && b.invoiceStatus !== "ERRO" && b.invoiceStatus !== "CANCELADA") return { ok: false, error: "Este lote já tem nota emitida ou em processamento." };
+  if (!b.insurer.cnpj) return { ok: false, error: "Cadastre o CNPJ do convênio para emitir a nota." };
+  const paid = await db.insurancePayment.aggregate({ where: { entry: { batchId } }, _sum: { amountCents: true } });
+  const total = paid._sum.amountCents ?? 0;
+  if (total <= 0) return { ok: false, error: "A nota é emitida sobre o valor recebido. Registre o retorno do convênio primeiro." };
+
+  let customerId = b.insurer.gatewayCustomerId;
+  if (!customerId) {
+    const c = await asaas<{ id: string }>(ctx, "POST", "/customers", { name: b.insurer.name, cpfCnpj: b.insurer.cnpj, externalReference: `insurer:${b.insurer.id}`, notificationDisabled: true });
+    if (!c.ok) return c;
+    customerId = c.data.id;
+    await db.insurer.update({ where: { id: b.insurer.id }, data: { gatewayCustomerId: customerId } });
+  }
+
+  const description = `Serviços de atendimento prestados a beneficiários do convênio ${b.insurer.name}, competência ${b.competence.split("-").reverse().join("/")} (lote ${b.number}).`;
+  const payload = buildInvoicePayload({ paymentId: null, customerId, valueCents: total, description, effectiveDate: localDate(new Date()), fiscal: ctx.fiscal, externalReference: `batch:${b.id}` });
+  const created = await asaas<{ id: string }>(ctx, "POST", "/invoices", payload);
+  if (!created.ok) return created;
+  await db.insuranceBatch.update({ where: { id: b.id }, data: { invoiceExternalId: created.data.id, invoiceStatus: "AGENDADA" } });
+  await asaas(ctx, "POST", `/invoices/${created.data.id}/authorize`);
+  return { ok: true, data: created.data.id };
+}

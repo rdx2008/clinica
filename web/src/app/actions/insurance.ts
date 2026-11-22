@@ -10,6 +10,7 @@ import { encryptField } from "@/lib/crypto";
 import { onlyDigits } from "@/lib/br";
 import { localDate } from "@/lib/agenda";
 import { parseBRL, validMonth } from "@/lib/money";
+import { addPayment } from "@/lib/insurance-pay";
 
 const FIN = ["ADMIN", "FINANCEIRO"] as const;
 const FRONT = ["ADMIN", "RECEPCAO"] as const;
@@ -175,21 +176,27 @@ function paymentDate(raw: string): Date {
   return dateOrNull(raw) ?? new Date(`${localDate(new Date())}T00:00:00.000Z`);
 }
 
+const OPEN = ["A_FATURAR", "FATURADO"];
+
+// Recebimento integral de um atendimento (sem glosa).
 export async function markEntryPaidAction(formData: FormData) {
   const user = await requireRole(...FIN);
   const id = String(formData.get("id") ?? "");
   const e = await db.insuranceEntry.findFirst({ where: { id, clinicId: user.clinicId } });
   if (!e) redirect("/financeiro/convenios");
-  if (e.status === "A_FATURAR" || e.status === "FATURADO") {
+  if (OPEN.includes(e.status)) {
     const paidAt = paymentDate(String(formData.get("date") ?? ""));
-    await db.insuranceEntry.update({ where: { id }, data: { status: "PAGO", paidAt, paymentMonth: paidAt.toISOString().slice(0, 7) } });
+    await db.$transaction(async (tx) => {
+      await addPayment(tx, e, e.amountCents, paidAt, "RETORNO");
+      await tx.insuranceEntry.update({ where: { id }, data: { status: "PAGO", paidAt, paymentMonth: paidAt.toISOString().slice(0, 7), glossReason: null } });
+    });
     await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_RECEBIDO", entity: "InsuranceEntry", entityId: id });
   }
   revalidatePath("/financeiro/convenios");
   redirect(`/financeiro/convenios/${e.insurerId}?mes=${e.competence}`);
 }
 
-// Recebimento do convênio de uma competência inteira (o pagamento do lote costuma vir de uma vez).
+// Recebimento integral de uma competência inteira. Para pagamento com glosa, use o retorno do lote.
 export async function markCompetencePaidAction(formData: FormData) {
   const user = await requireRole(...FIN);
   const insurerId = String(formData.get("insurerId") ?? "");
@@ -198,27 +205,35 @@ export async function markCompetencePaidAction(formData: FormData) {
   const insurer = await db.insurer.findFirst({ where: { id: insurerId, clinicId: user.clinicId }, select: { id: true } });
   if (!insurer) redirect("/financeiro/convenios");
   const paidAt = paymentDate(String(formData.get("date") ?? ""));
-  const r = await db.insuranceEntry.updateMany({
-    where: { clinicId: user.clinicId, insurerId, competence: mes, status: { in: ["A_FATURAR", "FATURADO"] } },
-    data: { status: "PAGO", paidAt, paymentMonth: paidAt.toISOString().slice(0, 7) },
+  const entries = await db.insuranceEntry.findMany({ where: { clinicId: user.clinicId, insurerId, competence: mes, status: { in: OPEN } } });
+  await db.$transaction(async (tx) => {
+    for (const e of entries) {
+      await addPayment(tx, e, e.amountCents, paidAt, "RETORNO");
+      await tx.insuranceEntry.update({ where: { id: e.id }, data: { status: "PAGO", paidAt, paymentMonth: paidAt.toISOString().slice(0, 7), glossReason: null } });
+    }
   });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_COMPETENCIA_RECEBIDA", entity: "Insurer", entityId: insurerId });
-  redirect(`/financeiro/convenios/${insurerId}?mes=${mes}&ok=${encodeURIComponent(`${r.count} atendimento(s) marcado(s) como recebido(s).`)}`);
+  redirect(`/financeiro/convenios/${insurerId}?mes=${mes}&ok=${encodeURIComponent(`${entries.length} atendimento(s) marcado(s) como recebido(s).`)}`);
 }
 
-// Estorno do recebimento (volta para a receber). Repasse já fechado do mês de recebimento bloqueia.
+// Estorno: apaga os pagamentos do atendimento e volta para faturado/a faturar.
+// Repasse já fechado em algum mês de recebimento bloqueia.
 export async function reopenEntryAction(formData: FormData) {
   const user = await requireRole(...FIN);
   const id = String(formData.get("id") ?? "");
-  const e = await db.insuranceEntry.findFirst({ where: { id, clinicId: user.clinicId } });
+  const e = await db.insuranceEntry.findFirst({ where: { id, clinicId: user.clinicId }, include: { payments: true } });
   if (!e) redirect("/financeiro/convenios");
   const back = (m: string): never => redirect(`/financeiro/convenios/${e.insurerId}?mes=${e.competence}&erro=${encodeURIComponent(m)}`);
-  if (e.status !== "PAGO") return back("Só é possível estornar atendimentos recebidos.");
-  if (e.paymentMonth) {
-    const closed = await db.payout.findFirst({ where: { clinicId: user.clinicId, professionalId: e.professionalId, period: e.paymentMonth }, select: { id: true } });
-    if (closed) return back("O repasse do mês do recebimento já foi fechado.");
+  if (OPEN.includes(e.status) || e.status === "CANCELADO") return back("Este atendimento ainda não teve retorno do convênio.");
+  const months = [...new Set(e.payments.map((p) => p.paymentMonth))];
+  if (months.length > 0) {
+    const closed = await db.payout.findFirst({ where: { clinicId: user.clinicId, professionalId: e.professionalId, period: { in: months } }, select: { period: true } });
+    if (closed) return back(`O repasse de ${closed.period.split("-").reverse().join("/")} já foi fechado.`);
   }
-  await db.insuranceEntry.update({ where: { id }, data: { status: e.batchId ? "FATURADO" : "A_FATURAR", paidAt: null, paymentMonth: null } });
+  await db.$transaction([
+    db.insurancePayment.deleteMany({ where: { entryId: id } }),
+    db.insuranceEntry.update({ where: { id }, data: { status: e.batchId ? "FATURADO" : "A_FATURAR", paidAt: null, paymentMonth: null, glossReason: null, appealNote: null } }),
+  ]);
   await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_ESTORNADO", entity: "InsuranceEntry", entityId: id });
   redirect(`/financeiro/convenios/${e.insurerId}?mes=${e.competence}`);
 }

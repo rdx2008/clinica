@@ -5,12 +5,22 @@ import { audit } from "@/lib/audit";
 import { localDate } from "@/lib/agenda";
 import { formatBRL } from "@/lib/money";
 import { loadBatchData } from "@/lib/insurance-batch-data";
+import { db } from "@/lib/db";
+import { GlossActions } from "@/components/gloss-actions";
+import { issueBatchInvoiceAction, refreshBatchInvoiceAction } from "@/app/actions/insurance-batch";
 import { deleteBatchAction, removeFromBatchAction, reopenBatchAction, saveBatchInvoiceAction, sendBatchAction } from "@/app/actions/insurance-batch";
 
 export const dynamic = "force-dynamic";
 
 const input = "rounded border bg-white px-3 py-2 text-sm";
 const btn = "rounded border px-2 py-1 text-xs";
+const STATUS_STYLE: Record<string, { label: string; style: string }> = {
+  FATURADO: { label: "Faturado", style: "bg-blue-100 text-blue-800" },
+  PAGO: { label: "Recebido", style: "bg-emerald-100 text-emerald-800" },
+  GLOSADO: { label: "Glosado", style: "bg-red-100 text-red-700" },
+  RECURSO: { label: "Em recurso", style: "bg-amber-100 text-amber-800" },
+  GLOSA_ACEITA: { label: "Glosa aceita", style: "bg-zinc-200 text-zinc-700" },
+};
 const fmt = (d: Date) => d.toISOString().slice(0, 10).split("-").reverse().join("/");
 const mask = (card: string) => (card.length > 4 ? `${"•".repeat(Math.min(card.length - 4, 8))}${card.slice(-4)}` : card);
 
@@ -23,6 +33,13 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
   const { batch, rows, totalCents } = data;
   await audit({ clinicId: user.clinicId, userId: user.id, action: "LOTE_VISUALIZADO", entity: "InsuranceBatch", entityId: batch.id });
   const today = localDate(new Date());
+  const payRows = await db.insurancePayment.findMany({ where: { entryId: { in: rows.map((r) => r.entryId) } }, select: { entryId: true, amountCents: true } });
+  const paid = new Map<string, number>();
+  for (const r of payRows) paid.set(r.entryId, (paid.get(r.entryId) ?? 0) + r.amountCents);
+  const reasons = new Map((await db.insuranceEntry.findMany({ where: { batchId: batch.id }, select: { id: true, glossReason: true, appealNote: true } })).map((e) => [e.id, e]));
+  const asaasOn = !!(await db.paymentAccount.findUnique({ where: { clinicId: user.clinicId }, select: { status: true } }).then((a) => a?.status === "ATIVA"));
+  const pendingReturn = rows.filter((r) => r.status === "FATURADO").length;
+  const receivedTotal = rows.reduce((t, r) => t + (paid.get(r.entryId) ?? 0), 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
@@ -37,15 +54,22 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
       {sp.erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{sp.erro}</p>}
       {sp.ok && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{sp.ok}</p>}
 
-      <div className="grid gap-3 text-sm sm:grid-cols-3">
+      <div className="grid gap-3 text-sm sm:grid-cols-4">
         <div className="rounded-xl border bg-white p-3 shadow-sm"><p className="text-xs text-zinc-500">Guias</p><p className="text-lg font-semibold">{rows.length}</p></div>
         <div className="rounded-xl border bg-white p-3 shadow-sm"><p className="text-xs text-zinc-500">Valor do lote</p><p className="text-lg font-semibold">{formatBRL(totalCents)}</p></div>
+        <div className="rounded-xl border bg-white p-3 shadow-sm"><p className="text-xs text-zinc-500">Recebido</p><p className="text-lg font-semibold text-emerald-700">{formatBRL(receivedTotal)}</p></div>
         <div className="rounded-xl border bg-white p-3 shadow-sm">
           <p className="text-xs text-zinc-500">Situação</p>
           <p className="text-lg font-semibold">{batch.status === "ENVIADO" ? "Enviado" : "Aberto"}</p>
           {batch.sentAt && <p className="text-xs text-zinc-500">em {fmt(batch.sentAt)}{batch.protocol ? ` · protocolo ${batch.protocol}` : ""}</p>}
         </div>
       </div>
+
+      {pendingReturn > 0 && (
+        <Link href={`/financeiro/convenios/${id}/lote/${batch.id}/retorno`} className="block rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          {pendingReturn} guia(s) aguardando retorno do convênio. <span className="underline">Registrar retorno do demonstrativo</span>
+        </Link>
+      )}
 
       <ul className="divide-y rounded border bg-white text-sm">
         {rows.map((r) => (
@@ -57,9 +81,9 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
                 {r.card && ` · carteirinha ${mask(r.card)}`}{r.authorization && ` · autorização ${r.authorization}`}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{formatBRL(r.amountCents)}</span>
-              <span className={`rounded px-2 py-0.5 text-xs ${r.status === "PAGO" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}`}>{r.status === "PAGO" ? "Recebido" : "Faturado"}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="font-medium">{formatBRL(r.amountCents)}{(paid.get(r.entryId) ?? 0) > 0 && (paid.get(r.entryId) ?? 0) < r.amountCents && <span className="ml-1 text-xs font-normal text-zinc-500">(pago {formatBRL(paid.get(r.entryId) ?? 0)})</span>}</span>
+              <span className={`rounded px-2 py-0.5 text-xs ${STATUS_STYLE[r.status]?.style ?? ""}`}>{STATUS_STYLE[r.status]?.label ?? r.status}</span>
               {r.status === "FATURADO" && (
                 <form action={removeFromBatchAction}>
                   <input type="hidden" name="id" value={r.entryId} />
@@ -67,6 +91,8 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
                 </form>
               )}
             </div>
+            {reasons.get(r.entryId)?.glossReason && <p className="w-full text-xs text-red-700">Glosa: {reasons.get(r.entryId)?.glossReason}{reasons.get(r.entryId)?.appealNote ? ` · recurso: ${reasons.get(r.entryId)?.appealNote}` : ""}</p>}
+            <GlossActions id={r.entryId} status={r.status} today={today} />
           </li>
         ))}
       </ul>
@@ -88,6 +114,31 @@ export default async function BatchPage({ params, searchParams }: { params: Prom
           </form>
         )}
         <p className="text-xs text-zinc-500">O envio em si é feito no portal da operadora. Aqui fica o controle de quando e com qual protocolo.</p>
+      </section>
+
+      <section className="space-y-3 rounded border bg-white p-4">
+        <h2>Emitir nota pelo sistema (Asaas)</h2>
+        <p className="text-xs text-zinc-500">
+          Opcional. Emite a NFS-e para o convênio (tomador pelo CNPJ) sobre o valor já recebido: <strong>{formatBRL(receivedTotal)}</strong>.
+          Exige o Asaas conectado com os dados fiscais confirmados pelo contador e o CNPJ do convênio cadastrado. Se preferir emitir por fora, use o formulário abaixo.
+        </p>
+        {batch.invoiceExternalId && batch.invoiceStatus !== "ERRO" && batch.invoiceStatus !== "CANCELADA" ? (
+          <form action={refreshBatchInvoiceAction} className="flex flex-wrap items-center gap-3 text-sm">
+            <input type="hidden" name="id" value={batch.id} />
+            <span className={`rounded px-2 py-0.5 text-xs ${batch.invoiceStatus === "EMITIDA" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>
+              NFS-e {batch.invoiceStatus === "EMITIDA" ? `emitida${batch.invoiceNumber ? ` nº ${batch.invoiceNumber}` : ""}` : "em processamento"}
+            </span>
+            {batch.invoiceStatus !== "EMITIDA" && <button className={btn}>Atualizar</button>}
+          </form>
+        ) : (
+          <form action={issueBatchInvoiceAction} className="flex flex-wrap items-center gap-3 text-sm">
+            <input type="hidden" name="id" value={batch.id} />
+            <button disabled={!asaasOn || receivedTotal <= 0} className="rounded border border-emerald-700 px-3 py-2 text-sm text-emerald-800 disabled:opacity-50">Emitir NFS-e do lote</button>
+            {!asaasOn && <span className="text-xs text-zinc-500">Asaas não conectado.</span>}
+            {asaasOn && receivedTotal <= 0 && <span className="text-xs text-zinc-500">Registre o retorno do convênio antes.</span>}
+            {batch.invoiceStatus === "ERRO" && <span className="text-xs text-red-700">A última tentativa foi recusada pela prefeitura.</span>}
+          </form>
+        )}
       </section>
 
       <form action={saveBatchInvoiceAction} className="space-y-3 rounded border bg-white p-4">

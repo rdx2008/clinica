@@ -17,7 +17,7 @@ export default async function InsurersPage({ searchParams }: { searchParams: Pro
 
   const [insurers, open] = await Promise.all([
     db.insurer.findMany({ where: { clinicId: user.clinicId }, orderBy: [{ active: "desc" }, { name: "asc" }], include: { _count: { select: { plans: true } } } }),
-    db.insuranceEntry.findMany({ where: { clinicId: user.clinicId, status: "A_FATURAR" }, select: { insurerId: true, amountCents: true, expectedDate: true } }),
+    db.insuranceEntry.findMany({ where: { clinicId: user.clinicId, status: { in: ["A_FATURAR", "FATURADO"] } }, select: { insurerId: true, amountCents: true, expectedDate: true } }),
   ]);
   const toReceive = new Map<string, { total: number; overdue: number; count: number }>();
   for (const e of open) {
@@ -35,6 +35,7 @@ export default async function InsurersPage({ searchParams }: { searchParams: Pro
       <FinanceTabs active="/financeiro/convenios" />
       {sp.erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{sp.erro}</p>}
 
+      <div className="flex justify-end"><Link href="/financeiro/convenios/relatorio" className="rounded border px-3 py-2 text-sm">Relatório de faturamento e glosa</Link></div>
       <p className="text-sm text-zinc-600">
         Convênios com a tabela de valores por serviço. Ao marcar o atendimento como <strong>Compareceu</strong>, o valor entra aqui como a receber.
         O repasse do profissional considera o que o convênio efetivamente pagou.

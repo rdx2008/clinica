@@ -805,6 +805,7 @@ model Insurer {
   cnpj         String?
   paymentDays  Int      @default(30) // prazo médio de pagamento (dias após o atendimento)
   sharePercent Int? // % de repasse do profissional neste convênio (null = usa o do profissional)
+  gatewayCustomerId String? // cliente no gateway (cus_...), criado ao emitir a nota do lote
   active       Boolean  @default(true)
   notes        String?
   createdAt    DateTime @default(now())
@@ -877,15 +878,18 @@ model InsuranceEntry {
   serviceDate    DateTime
   competence     String // AAAA-MM do atendimento
   expectedDate   DateTime // previsão de pagamento
-  status         String    @default("A_FATURAR") // A_FATURAR | FATURADO | PAGO | CANCELADO (glosa entra na fase 3)
+  status         String    @default("A_FATURAR") // A_FATURAR | FATURADO | PAGO | GLOSADO | RECURSO | GLOSA_ACEITA | CANCELADO
   paidAt         DateTime?
   paymentMonth   String? // AAAA-MM do recebimento (base do repasse)
   batchId        String?
   guideNumber    String? // número da guia dentro do lote
+  glossReason    String? // motivo da glosa informado pelo convênio
+  appealNote     String? // texto do recurso de glosa
   createdAt      DateTime  @default(now())
 
   insurer     Insurer     @relation(fields: [insurerId], references: [id])
   batch       InsuranceBatch? @relation(fields: [batchId], references: [id])
+  payments    InsurancePayment[]
   appointment Appointment @relation(fields: [appointmentId], references: [id])
 
   @@index([clinicId, competence])
@@ -906,6 +910,8 @@ model InsuranceBatch {
   invoiceNumber String? // nota fiscal emitida para o convênio (por fora ou integrada na fase 3)
   invoiceDate   DateTime?
   invoiceUrl    String?
+  invoiceExternalId String? // nota emitida pelo gateway (inv_...), quando emitida pelo sistema
+  invoiceStatus     String? // AGENDADA | EMITIDA | CANCELANDO | CANCELADA | ERRO
   notes         String?
   createdAt     DateTime  @default(now())
 
@@ -945,4 +951,24 @@ model PackageRequest {
   createdAt      DateTime  @default(now())
 
   @@index([clinicId, status])
+}
+
+// Cada valor efetivamente pago pelo convênio (retorno do demonstrativo ou recurso). Base do repasse.
+model InsurancePayment {
+  id             String   @id @default(cuid())
+  clinicId       String
+  entryId        String
+  insurerId      String
+  professionalId String
+  amountCents    Int
+  paidAt         DateTime
+  paymentMonth   String // AAAA-MM do recebimento
+  kind           String   @default("RETORNO") // RETORNO | RECURSO
+  createdAt      DateTime @default(now())
+
+  entry InsuranceEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@index([entryId])
+  @@index([clinicId, paymentMonth])
+  @@index([professionalId, paymentMonth])
 }

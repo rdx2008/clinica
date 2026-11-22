@@ -5,7 +5,8 @@ import { requireRole } from "@/lib/session";
 import { localDate } from "@/lib/agenda";
 import { formatBRL, shiftMonth, validMonth } from "@/lib/money";
 import { createBatchAction } from "@/app/actions/insurance-batch";
-import { markCompetencePaidAction, markEntryPaidAction, reopenEntryAction, setInsurerPriceAction, updateInsurerAction } from "@/app/actions/insurance";
+import { markCompetencePaidAction, markEntryPaidAction, setInsurerPriceAction, updateInsurerAction } from "@/app/actions/insurance";
+import { GlossActions } from "@/components/gloss-actions";
 import { FinanceTabs } from "@/components/finance-tabs";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +17,9 @@ const STATUS: Record<string, { label: string; style: string }> = {
   A_FATURAR: { label: "A faturar", style: "bg-zinc-100 text-zinc-700" },
   FATURADO: { label: "Faturado", style: "bg-blue-100 text-blue-800" },
   PAGO: { label: "Recebido", style: "bg-emerald-100 text-emerald-800" },
+  GLOSADO: { label: "Glosado", style: "bg-red-100 text-red-700" },
+  RECURSO: { label: "Em recurso", style: "bg-amber-100 text-amber-800" },
+  GLOSA_ACEITA: { label: "Glosa aceita", style: "bg-zinc-200 text-zinc-700" },
   CANCELADO: { label: "Cancelado", style: "bg-zinc-100 text-zinc-400 line-through" },
 };
 const fmt = (d: Date) => d.toISOString().slice(0, 10).split("-").reverse().join("/");
@@ -34,6 +38,9 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
     db.insuranceEntry.findMany({ where: { clinicId: user.clinicId, insurerId: id, competence: mes }, orderBy: { serviceDate: "asc" } }),
     db.insuranceBatch.findMany({ where: { clinicId: user.clinicId, insurerId: id }, orderBy: { number: "desc" }, take: 24, include: { _count: { select: { entries: true } } } }),
   ]);
+  const payRows = await db.insurancePayment.findMany({ where: { entryId: { in: entries.map((e) => e.id) } }, select: { entryId: true, amountCents: true } });
+  const paid = new Map<string, number>();
+  for (const r of payRows) paid.set(r.entryId, (paid.get(r.entryId) ?? 0) + r.amountCents);
   const [patients, appts] = await Promise.all([
     db.patient.findMany({ where: { id: { in: [...new Set(entries.map((e) => e.patientId))] } }, select: { id: true, fullName: true } }),
     db.appointment.findMany({ where: { id: { in: entries.map((e) => e.appointmentId) } }, select: { id: true, service: { select: { name: true } } } }),
@@ -47,6 +54,8 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
   const toBill = live.filter((e) => e.status === "A_FATURAR");
   const open = live.filter((e) => e.status === "A_FATURAR" || e.status === "FATURADO");
   const sum = (rows: typeof entries) => rows.reduce((t, e) => t + e.amountCents, 0);
+  const received = live.reduce((t, e) => t + (paid.get(e.id) ?? 0), 0);
+  const glossOpen = live.filter((e) => e.status === "GLOSADO" || e.status === "RECURSO").reduce((t, e) => t + e.amountCents - (paid.get(e.id) ?? 0), 0);
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -63,10 +72,11 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
           <Link href={`/financeiro/convenios/${id}?mes=${shiftMonth(mes, 1)}`} className={btn}>→</Link>
           <span className="text-xs text-zinc-500">competência = mês do atendimento</span>
         </div>
-        <div className="grid gap-3 text-sm sm:grid-cols-3">
+        <div className="grid gap-3 text-sm sm:grid-cols-4">
           <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">Atendimentos</p><p className="text-lg font-semibold">{live.length}</p></div>
           <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">A receber (faturado ou não)</p><p className="text-lg font-semibold">{formatBRL(sum(open))}</p></div>
-          <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">Recebido</p><p className="text-lg font-semibold text-emerald-700">{formatBRL(sum(live.filter((e) => e.status === "PAGO")))}</p></div>
+          <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">Recebido</p><p className="text-lg font-semibold text-emerald-700">{formatBRL(received)}</p></div>
+          <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">Glosa em aberto</p><p className="text-lg font-semibold text-red-700">{formatBRL(glossOpen)}</p></div>
         </div>
         {toBill.length > 0 && (
           <form action={createBatchAction} className="flex flex-wrap items-center gap-2 text-sm">
@@ -82,6 +92,7 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
             <input type="hidden" name="mes" value={mes} />
             <label className="text-xs">Data do recebimento<input name="date" type="date" defaultValue={today} className={`${input} ml-2`} /></label>
             <button className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">Marcar todos como recebidos ({open.length})</button>
+            <span className="text-xs text-zinc-500">Pagamento integral. Se houve glosa, registre o retorno pelo lote.</span>
           </form>
         )}
         <ul className="divide-y rounded border text-sm">
@@ -95,9 +106,10 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
                   {e.guideNumber && ` · guia ${e.guideNumber}`}
                   {e.paidAt && ` · recebido em ${fmt(e.paidAt)}`}
                 </p>
+                {e.glossReason && <p className="text-xs text-red-700">Glosa: {e.glossReason}</p>}
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium">{formatBRL(e.amountCents)}</span>
+                <span className="font-medium">{formatBRL(e.amountCents)}{(paid.get(e.id) ?? 0) > 0 && (paid.get(e.id) ?? 0) < e.amountCents && <span className="ml-1 text-xs font-normal text-zinc-500">(pago {formatBRL(paid.get(e.id) ?? 0)})</span>}</span>
                 <span className={`rounded px-2 py-0.5 text-xs ${STATUS[e.status]?.style}`}>{STATUS[e.status]?.label ?? e.status}</span>
                 {(e.status === "A_FATURAR" || e.status === "FATURADO") && (
                   <form action={markEntryPaidAction}>
@@ -106,13 +118,8 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
                     <button className={btn}>Marcar recebido</button>
                   </form>
                 )}
-                {e.status === "PAGO" && (
-                  <form action={reopenEntryAction}>
-                    <input type="hidden" name="id" value={e.id} />
-                    <button className={btn} title="Volta para a receber">Estornar</button>
-                  </form>
-                )}
               </div>
+              <GlossActions id={e.id} status={e.status} today={today} />
             </li>
           ))}
         </ul>

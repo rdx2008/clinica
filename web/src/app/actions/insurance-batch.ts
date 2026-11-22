@@ -7,6 +7,8 @@ import { audit } from "@/lib/audit";
 import { localDate } from "@/lib/agenda";
 import { validMonth } from "@/lib/money";
 import { guideNumber } from "@/lib/insurance-core";
+import { asaas, issueInvoiceForBatch, loadAsaas } from "@/lib/asaas";
+import { mapInvoiceStatus } from "@/lib/asaas-core";
 
 const FIN = ["ADMIN", "FINANCEIRO"] as const;
 
@@ -117,4 +119,39 @@ export async function deleteBatchAction(formData: FormData) {
   ]);
   await audit({ clinicId: user.clinicId, userId: user.id, action: "LOTE_DESFEITO", entity: "InsuranceBatch", entityId: b.id });
   redirect(`/financeiro/convenios/${b.insurerId}?mes=${b.competence}`);
+}
+
+// ---- Nota do lote emitida pelo Asaas (opcional; exige configuração fiscal e CNPJ do convênio) ----
+
+export async function issueBatchInvoiceAction(formData: FormData) {
+  const user = await requireRole(...FIN);
+  const b = await loadBatch(user.clinicId, String(formData.get("id") ?? ""));
+  const ctx = await loadAsaas(user.clinicId);
+  if (!ctx) return err(b, "Conecte o Asaas em Configurações → Pagamentos para emitir a nota pelo sistema.");
+  const r = await issueInvoiceForBatch(ctx, b.id);
+  if (!r.ok) return err(b, r.error);
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "LOTE_NOTA_EMITIDA", entity: "InsuranceBatch", entityId: b.id });
+  redirect(batchUrl(b, `?ok=${encodeURIComponent("Nota enviada para emissão. Use Atualizar para ver o resultado da prefeitura.")}`));
+}
+
+export async function refreshBatchInvoiceAction(formData: FormData) {
+  const user = await requireRole(...FIN);
+  const b = await loadBatch(user.clinicId, String(formData.get("id") ?? ""));
+  if (!b.invoiceExternalId) return err(b, "Este lote não tem nota emitida pelo sistema.");
+  const ctx = await loadAsaas(user.clinicId);
+  if (!ctx) return err(b, "Conecte o Asaas em Configurações → Pagamentos.");
+  const r = await asaas<{ status?: string; number?: string | number; pdfUrl?: string; statusDescription?: string }>(ctx, "GET", `/invoices/${b.invoiceExternalId}`);
+  if (!r.ok) return err(b, r.error);
+  const status = mapInvoiceStatus(r.data.status);
+  await db.insuranceBatch.update({
+    where: { id: b.id },
+    data: {
+      invoiceStatus: status,
+      ...(r.data.number ? { invoiceNumber: String(r.data.number) } : {}),
+      ...(r.data.pdfUrl ? { invoiceUrl: r.data.pdfUrl } : {}),
+      ...(status === "EMITIDA" && !b.invoiceDate ? { invoiceDate: new Date(`${localDate(new Date())}T00:00:00.000Z`) } : {}),
+    },
+  });
+  if (status === "ERRO") return err(b, r.data.statusDescription ?? "A prefeitura recusou a nota. Verifique os dados fiscais.");
+  redirect(batchUrl(b));
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { decryptField } from "@/lib/crypto";
 import { getPortalSession, patientsForEmail } from "@/lib/portal";
 import { localDate, localTime, nowPlus, STATUS_LABEL } from "@/lib/agenda";
 import { effectiveStatus, formatBRL } from "@/lib/money";
@@ -37,10 +38,11 @@ export default async function PortalHome({ params, searchParams }: { params: Pro
       include: { invoices: { where: { status: "EMITIDA" }, take: 1 } },
     }),
   ]);
-  const [pendingScales, docs, accepted] = await Promise.all([
+  const [pendingScales, docs, accepted, pendingTasks] = await Promise.all([
     db.scaleAssignment.findMany({ where: { clinicId: s.clinic.id, patientId: { in: ids }, status: "PENDENTE" }, orderBy: { sentAt: "asc" } }),
     db.clinicDocument.findMany({ where: { clinicId: s.clinic.id, active: true }, orderBy: { createdAt: "asc" } }),
     db.documentAcceptance.findMany({ where: { clinicId: s.clinic.id, patientId: { in: ids } }, select: { patientId: true, documentId: true } }),
+    db.patientTask.findMany({ where: { clinicId: s.clinic.id, patientId: { in: ids }, status: "PENDENTE" }, orderBy: { createdAt: "asc" } }),
   ]);
   const acceptedKey = new Set(accepted.map((a) => `${a.patientId}|${a.documentId}`));
   const pendingTerms = docs.filter((d) => ids.some((pid) => !acceptedKey.has(`${pid}|${d.id}`)));
@@ -59,7 +61,7 @@ export default async function PortalHome({ params, searchParams }: { params: Pro
       {sp.erro && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{sp.erro}</p>}
       {patients.length === 0 && <p className="rounded-lg border bg-white p-4 text-sm text-zinc-600">Não encontramos cadastro ativo para este e-mail.</p>}
 
-      {(pendingScales.length > 0 || pendingTerms.length > 0) && (
+      {(pendingScales.length > 0 || pendingTerms.length > 0 || pendingTasks.length > 0) && (
         <section className="space-y-2 rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <h2 className="text-amber-900">Pendências</h2>
           <ul className="space-y-2 text-sm">
@@ -67,6 +69,12 @@ export default async function PortalHome({ params, searchParams }: { params: Pro
               <li key={d.id} className="flex flex-wrap items-center justify-between gap-2">
                 <span>Ler e aceitar: <strong>{d.title}</strong></span>
                 <Link href={`/p/${slug}/termo/${d.id}`} className="rounded bg-emerald-700 px-3 py-1.5 text-white">Abrir</Link>
+              </li>
+            ))}
+            {pendingTasks.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2">
+                <span>Tarefa: <strong>{decryptField(t.titleEnc)}</strong>{patients.length > 1 && <> ({name.get(t.patientId)})</>}{t.dueDate && <span className="text-xs text-zinc-600"> · para {t.dueDate.toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>}</span>
+                <Link href={`/p/${slug}/tarefa/${t.id}`} className="rounded bg-emerald-700 px-3 py-1.5 text-white">Abrir</Link>
               </li>
             ))}
             {pendingScales.map((a) => (

@@ -75,7 +75,9 @@ No Coolify, na aplicação: **Scheduled Tasks → Add**.
 wget -qO- --post-data='' --header="Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/lembretes
 ```
 
-A resposta traz a contagem de lembretes enviados, ignorados e com falha.
+A mesma chamada executa três rotinas: lembretes de consulta, avisos de pendência do portal (questionário, tarefa e termo) e a atualização das notas de lote de convênio emitidas pelo Asaas. A resposta traz a contagem de cada uma.
+
+Para o aviso de pendências o sistema precisa saber o endereço público: ele usa a variável `APP_URL` (ex.: `https://clinica.exemplo.com.br`) e, se ela não existir, a `COOLIFY_URL` que o Coolify injeta. Também é preciso ter o endereço do portal (slug) configurado em Configurações.
 
 ## 6. WhatsApp (Meta)
 

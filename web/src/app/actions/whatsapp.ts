@@ -105,12 +105,17 @@ export async function setTemplateStatusAction(formData: FormData) {
 export async function createAutomationAction(formData: FormData) {
   const user = await requireRole("ADMIN");
   const back = (m: string): never => redirect(`/configuracoes/whatsapp/modelos?erro=${encodeURIComponent(m)}`);
+  const trigger = formData.get("trigger") === "PENDENCIA" ? "PENDENCIA" : "LEMBRETE";
   const hours = Number(formData.get("hours"));
-  if (!Number.isFinite(hours) || hours < 2 || hours > 168) return back("Informe de 2 a 168 horas de antecedência.");
+  if (trigger === "LEMBRETE" && (!Number.isFinite(hours) || hours < 2 || hours > 168)) return back("Informe de 2 a 168 horas de antecedência.");
   const template = await db.waTemplate.findFirst({ where: { id: String(formData.get("templateId") ?? ""), clinicId: user.clinicId } });
   if (!template) return back("Selecione um modelo.");
+  if (trigger === "PENDENCIA") {
+    const already = await db.automation.findFirst({ where: { clinicId: user.clinicId, trigger: "PENDENCIA" }, select: { id: true } });
+    if (already) return back("Já existe um aviso de pendências. Desligue ou use o existente.");
+  }
   const a = await db.automation.create({
-    data: { clinicId: user.clinicId, trigger: "LEMBRETE", offsetMin: Math.round(hours * 60), templateId: template.id },
+    data: { clinicId: user.clinicId, trigger, offsetMin: trigger === "LEMBRETE" ? Math.round(hours * 60) : 0, templateId: template.id },
   });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "WHATSAPP_AUTOMACAO_CRIADA", entity: "Automation", entityId: a.id });
   redirect("/configuracoes/whatsapp/modelos");

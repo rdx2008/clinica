@@ -142,6 +142,7 @@ export async function anonymizePatientAction(formData: FormData) {
     db.patientInsurance.updateMany({ where: { patientId: id }, data: { cardEnc: encryptField("removido"), planName: null, active: false } }),
     db.consent.updateMany({ where: { patientId: id, revokedAt: null }, data: { revokedAt: new Date() } }),
     db.waitlistEntry.updateMany({ where: { patientId: id, status: "ABERTA" }, data: { status: "REMOVIDA" } }),
+    db.patientTask.updateMany({ where: { patientId: id, status: "PENDENTE" }, data: { status: "CANCELADA" } }),
   ]);
   await audit({ clinicId: user.clinicId, userId: user.id, action: "PACIENTE_ANONIMIZADO", entity: "Patient", entityId: id });
   revalidatePath("/pacientes");
@@ -180,6 +181,8 @@ export async function mergePatientsAction(formData: FormData) {
     db.insuranceEntry.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.scaleAssignment.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     db.therapyPlan.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.patientTask.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
+    db.portalNotice.deleteMany({ where: { patientId: dropId } }),
     db.documentAcceptance.deleteMany({ where: { patientId: dropId, documentId: { in: (await db.documentAcceptance.findMany({ where: { patientId: keepId }, select: { documentId: true } })).map((a) => a.documentId) } } }),
     db.documentAcceptance.updateMany({ where: { patientId: dropId }, data: { patientId: keepId } }),
     // completa campos vazios do cadastro mantido com os do duplicado

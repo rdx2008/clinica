@@ -81,7 +81,7 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
           {automations.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span>
-                {a.offsetMin / 60} h antes · modelo <strong>{a.template.name}</strong>
+                {a.trigger === "PENDENCIA" ? "Aviso de pendências do portal" : `${a.offsetMin / 60} h antes`} · modelo <strong>{a.template.name}</strong>
                 {a.template.status !== "APROVADO" && <span className="ml-2 text-xs text-amber-700">(modelo não aprovado: não será enviado)</span>}
               </span>
               <form action={toggleAutomationAction}>
@@ -100,6 +100,23 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
               {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
             <button className="rounded border px-3 py-2 text-sm">Adicionar lembrete</button>
+          </form>
+        )}
+        {templates.length > 0 && !automations.some((a) => a.trigger === "PENDENCIA") && (
+          <form action={createAutomationAction} className="space-y-2 rounded border border-dashed p-3">
+            <input type="hidden" name="trigger" value="PENDENCIA" />
+            <p className="text-sm font-medium">Aviso de pendências do portal</p>
+            <p className="text-xs text-zinc-500">
+              Avisa o paciente (com autorização de WhatsApp) quando há questionário, tarefa ou termo para ele no portal. Um aviso por item, sem repetir, e sem nenhum conteúdo clínico na mensagem.
+              Variáveis do modelo: {"{{1}}"} nome, {"{{2}}"} endereço do portal, {"{{3}}"} resumo (ex.: “1 questionário e 1 tarefa”).
+              Exemplo: “Olá {"{{1}}"}, você tem {"{{3}}"} no portal da clínica: {"{{2}}"}”. Exige o endereço do portal configurado.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select name="templateId" className={input}>
+                {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+              <button className="rounded border px-3 py-2 text-sm">Adicionar aviso de pendências</button>
+            </div>
           </form>
         )}
         <p className="text-xs text-zinc-500">

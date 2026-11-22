@@ -66,57 +66,57 @@ enum ChargeStatus {
 }
 
 model Clinic {
-  id        String   @id @default(cuid())
-  name      String
-  cnpj      String?
-  portalSlug String? @unique // endereço do portal do paciente (/p/<slug>)
-  phone     String?
-  email     String?
-  address   String?
-  timezone  String   @default("America/Sao_Paulo")
-  settings  Json     @default("{}")
-  createdAt DateTime @default(now())
+  id         String   @id @default(cuid())
+  name       String
+  cnpj       String?
+  portalSlug String?  @unique // endereço do portal do paciente (/p/<slug>)
+  phone      String?
+  email      String?
+  address    String?
+  timezone   String   @default("America/Sao_Paulo")
+  settings   Json     @default("{}")
+  createdAt  DateTime @default(now())
 
-  users         User[]
-  professionals Professional[]
-  services      Service[]
-  rooms         Room[]
-  patients      Patient[]
-  appointments  Appointment[]
-  records       ClinicalRecord[]
-  waAccounts    WaAccount[]
-  waTemplates   WaTemplate[]
-  conversations WaConversation[]
-  automations   Automation[]
-  aiConfig      AiConfig?
-  charges       Charge[]
-  packages      Package[]
-  payouts       Payout[]
-  waitlist      WaitlistEntry[]
+  users           User[]
+  professionals   Professional[]
+  services        Service[]
+  rooms           Room[]
+  patients        Patient[]
+  appointments    Appointment[]
+  records         ClinicalRecord[]
+  waAccounts      WaAccount[]
+  waTemplates     WaTemplate[]
+  conversations   WaConversation[]
+  automations     Automation[]
+  aiConfig        AiConfig?
+  charges         Charge[]
+  packages        Package[]
+  payouts         Payout[]
+  waitlist        WaitlistEntry[]
   recordTemplates RecordTemplate[]
-  expenses      Expense[]
-  quickReplies  QuickReply[]
-  paymentAccount PaymentAccount?
-  invoices      Invoice[]
-  auditLogs     AuditLog[]
-  importJobs    ImportJob[]
+  expenses        Expense[]
+  quickReplies    QuickReply[]
+  paymentAccount  PaymentAccount?
+  invoices        Invoice[]
+  auditLogs       AuditLog[]
+  importJobs      ImportJob[]
 }
 
 model User {
-  id           String   @id @default(cuid())
-  clinicId     String
-  name         String
-  email        String
-  passwordHash String
-  mfaSecret    String?
-  role         Role
-  active       Boolean  @default(true)
-  mustChangePassword Boolean @default(false)
+  id                 String    @id @default(cuid())
+  clinicId           String
+  name               String
+  email              String
+  passwordHash       String
+  mfaSecret          String?
+  role               Role
+  active             Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
   sessionsValidAfter DateTime? // sessões emitidas antes disso são recusadas
   mfaBackupHashes    String[]  @default([]) // hashes (sha256) de códigos de backup do MFA
   resetTokenHash     String? // hash do link de redefinição de senha
   resetTokenExpires  DateTime?
-  createdAt    DateTime @default(now())
+  createdAt          DateTime  @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
   professional Professional?
@@ -135,8 +135,8 @@ model Professional {
   color             String? // cor na agenda (#rrggbb)
   sharePercent      Int     @default(0) // % de repasse sobre o recebido
 
-  clinic       Clinic         @relation(fields: [clinicId], references: [id])
-  user         User           @relation(fields: [userId], references: [id])
+  clinic       Clinic           @relation(fields: [clinicId], references: [id])
+  user         User             @relation(fields: [userId], references: [id])
   availability Availability[]
   blocks       Block[]
   appointments Appointment[]
@@ -168,38 +168,38 @@ model Room {
 }
 
 model Patient {
-  id        String   @id @default(cuid())
-  clinicId  String
-  fullName  String
-  birthDate DateTime?
-  cpfEnc    String? // criptografado em nível de campo
-  phoneE164 String?
-  email     String?
-  source    String?
-  tags      String[]
-  sex       String? // F | M | O
-  occupation String?
-  address   String?
-  emergencyName  String?
-  emergencyPhone String?
-  insurance String? // convênio / plano
-  adminNotes String? // observações administrativas (nunca clínicas)
+  id                String    @id @default(cuid())
+  clinicId          String
+  fullName          String
+  birthDate         DateTime?
+  cpfEnc            String? // criptografado em nível de campo
+  phoneE164         String?
+  email             String?
+  source            String?
+  tags              String[]
+  sex               String? // F | M | O
+  occupation        String?
+  address           String?
+  emergencyName     String?
+  emergencyPhone    String?
+  insurance         String? // convênio / plano
+  adminNotes        String? // observações administrativas (nunca clínicas)
   gatewayCustomerId String? // id do cliente no gateway (cus_...)
-  status    String   @default("ATIVO")
-  dedupeKey String? // hash normalizado (nome + nascimento + telefone)
-  createdAt DateTime @default(now())
+  status            String    @default("ATIVO")
+  dedupeKey         String? // hash normalizado (nome + nascimento + telefone)
+  createdAt         DateTime  @default(now())
 
-  clinic       Clinic              @relation(fields: [clinicId], references: [id])
-  guardians    Guardian[]
-  contacts     AuthorizedContact[]
-  preferences  ContactPreference[]
-  consents     Consent[]
-  appointments Appointment[]
-  records      ClinicalRecord[]
+  clinic        Clinic              @relation(fields: [clinicId], references: [id])
+  guardians     Guardian[]
+  contacts      AuthorizedContact[]
+  preferences   ContactPreference[]
+  consents      Consent[]
+  appointments  Appointment[]
+  records       ClinicalRecord[]
   conversations WaConversation[]
-  charges      Charge[]
-  waitlist     WaitlistEntry[]
-  packages     Package[]
+  charges       Charge[]
+  waitlist      WaitlistEntry[]
+  packages      Package[]
 
   @@index([clinicId, fullName])
   @@index([clinicId, dedupeKey])
@@ -286,43 +286,43 @@ model Recurrence {
 }
 
 model Appointment {
-  id             String            @id @default(cuid())
-  clinicId       String
-  patientId      String
-  professionalId String
-  serviceId      String
-  roomId         String?
-  startsAt       DateTime
-  endsAt         DateTime
-  status         AppointmentStatus @default(AGENDADA)
-  recurrenceId   String?
-  source         String? // WHATSAPP | IA | MANUAL
-  idempotencyKey String?           @unique
-  meetingUrl     String?
-  cancelReason   String?
-  cancelledAt    DateTime?
-  packageId      String?
+  id                 String            @id @default(cuid())
+  clinicId           String
+  patientId          String
+  professionalId     String
+  serviceId          String
+  roomId             String?
+  startsAt           DateTime
+  endsAt             DateTime
+  status             AppointmentStatus @default(AGENDADA)
+  recurrenceId       String?
+  source             String? // WHATSAPP | IA | MANUAL
+  idempotencyKey     String?           @unique
+  meetingUrl         String?
+  cancelReason       String?
+  cancelledAt        DateTime?
+  packageId          String?
   patientInsuranceId String? // atendimento pelo convênio
   authorizationId    String? // autorização usada
-  createdAt      DateTime          @default(now())
+  createdAt          DateTime          @default(now())
 
-  clinic       Clinic        @relation(fields: [clinicId], references: [id])
-  patient      Patient       @relation(fields: [patientId], references: [id])
-  professional Professional  @relation(fields: [professionalId], references: [id])
-  service      Service       @relation(fields: [serviceId], references: [id])
-  room         Room?         @relation(fields: [roomId], references: [id])
-  recurrence   Recurrence?   @relation(fields: [recurrenceId], references: [id])
-  package      Package?      @relation(fields: [packageId], references: [id])
+  clinic           Clinic            @relation(fields: [clinicId], references: [id])
+  patient          Patient           @relation(fields: [patientId], references: [id])
+  professional     Professional      @relation(fields: [professionalId], references: [id])
+  service          Service           @relation(fields: [serviceId], references: [id])
+  room             Room?             @relation(fields: [roomId], references: [id])
+  recurrence       Recurrence?       @relation(fields: [recurrenceId], references: [id])
+  package          Package?          @relation(fields: [packageId], references: [id])
   patientInsurance PatientInsurance? @relation(fields: [patientInsuranceId], references: [id])
   authorization    InsuranceAuth?    @relation(fields: [authorizationId], references: [id])
   insuranceEntry   InsuranceEntry?
-  records      ClinicalRecord[]
-  charges      Charge[]
-  runs         AutomationRun[]
+  records          ClinicalRecord[]
+  charges          Charge[]
+  runs             AutomationRun[]
+  // Anti-sobreposição: EXCLUDE constraint (btree_gist) na migração 20261118000000_appointment_no_overlap.
 
   @@index([clinicId, startsAt])
   @@index([professionalId, startsAt])
-  // Anti-sobreposição: EXCLUDE constraint (btree_gist) na migração 20261118000000_appointment_no_overlap.
 }
 
 model ClinicalRecord {
@@ -338,10 +338,10 @@ model ClinicalRecord {
   approvedAt     DateTime?
   createdAt      DateTime     @default(now())
 
-  clinic       Clinic        @relation(fields: [clinicId], references: [id])
-  patient      Patient       @relation(fields: [patientId], references: [id])
-  professional Professional  @relation(fields: [professionalId], references: [id])
-  appointment  Appointment?  @relation(fields: [appointmentId], references: [id])
+  clinic       Clinic                  @relation(fields: [clinicId], references: [id])
+  patient      Patient                 @relation(fields: [patientId], references: [id])
+  professional Professional            @relation(fields: [professionalId], references: [id])
+  appointment  Appointment?            @relation(fields: [appointmentId], references: [id])
   versions     ClinicalRecordVersion[]
   attachments  ClinicalAttachment[]
   grants       ClinicalAccessGrant[]
@@ -360,11 +360,11 @@ model ClinicalRecordVersion {
 }
 
 model ClinicalAttachment {
-  id      String @id @default(cuid())
-  recordId String
-  fileKey String
-  mime    String
-  size    Int
+  id         String   @id @default(cuid())
+  recordId   String
+  fileKey    String
+  mime       String
+  size       Int
   name       String   @default("")
   data       Bytes? // conteúdo criptografado (AES-256-GCM)
   uploadedBy String   @default("")
@@ -414,18 +414,18 @@ model WaTemplate {
 }
 
 model WaConversation {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   clinicId        String
   patientId       String?
   waContact       String
   assignedTo      String?
-  aiState         AiState  @default(ATIVA)
-  lastMsgAt       DateTime @default(now())
+  aiState         AiState   @default(ATIVA)
+  lastMsgAt       DateTime  @default(now())
   windowExpiresAt DateTime?
-  unread          Int      @default(0)
+  unread          Int       @default(0)
 
-  clinic   Clinic       @relation(fields: [clinicId], references: [id])
-  patient  Patient?     @relation(fields: [patientId], references: [id])
+  clinic   Clinic      @relation(fields: [clinicId], references: [id])
+  patient  Patient?    @relation(fields: [patientId], references: [id])
   messages WaMessage[]
   aiEvents AiEvent[]
   notes    WaNote[]
@@ -512,7 +512,7 @@ model Charge {
   status        ChargeStatus @default(PENDENTE)
   method        String?
   paidAt        DateTime?
-  gatewayId     String?   @unique // id da cobrança no gateway (pay_...)
+  gatewayId     String?      @unique // id da cobrança no gateway (pay_...)
   gatewayUrl    String? // link da fatura no gateway
   pixPayload    String? // Pix copia e cola
   pixQrImage    String? // QR Code em base64 (PNG)
@@ -525,16 +525,16 @@ model Charge {
 }
 
 model Package {
-  id            String @id @default(cuid())
+  id            String    @id @default(cuid())
   clinicId      String
   patientId     String
   serviceId     String
   sessionsTotal Int
-  sessionsUsed  Int    @default(0)
+  sessionsUsed  Int       @default(0)
   priceCents    Int
   planId        String? // modelo do catálogo usado na venda
   validUntil    DateTime? // sessões só são consumidas até esta data
-  createdAt     DateTime @default(now())
+  createdAt     DateTime  @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
   patient      Patient       @relation(fields: [patientId], references: [id])
@@ -543,15 +543,15 @@ model Package {
 }
 
 model Payout {
-  id             String @id @default(cuid())
+  id             String    @id @default(cuid())
   clinicId       String
   professionalId String
   period         String // AAAA-MM
   grossCents     Int
   shareCents     Int
-  status         String @default("PENDENTE")
+  status         String    @default("PENDENTE")
   paidAt         DateTime?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime  @default(now())
 
   clinic       Clinic       @relation(fields: [clinicId], references: [id])
   professional Professional @relation(fields: [professionalId], references: [id])
@@ -594,13 +594,13 @@ model WaitlistEntry {
 
 // Modelos de registro/documento (texto-base com variáveis). professionalId nulo = modelo da clínica.
 model RecordTemplate {
-  id             String   @id @default(cuid())
+  id             String     @id @default(cuid())
   clinicId       String
   professionalId String?
   name           String
   type           RecordType
   content        String
-  createdAt      DateTime @default(now())
+  createdAt      DateTime   @default(now())
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
@@ -665,20 +665,20 @@ model PaymentAccount {
 
 // Nota fiscal de serviço (NFS-e) emitida pelo gateway.
 model Invoice {
-  id               String   @id @default(cuid())
-  clinicId         String
-  chargeId         String
-  patientId        String
-  provider         String   @default("ASAAS")
-  externalId       String?  @unique
-  status           String   @default("AGENDADA") // AGENDADA | EMITIDA | CANCELANDO | CANCELADA | ERRO
-  number           String?
-  pdfUrl           String?
-  xmlUrl           String?
-  valueCents       Int
+  id                 String   @id @default(cuid())
+  clinicId           String
+  chargeId           String
+  patientId          String
+  provider           String   @default("ASAAS")
+  externalId         String?  @unique
+  status             String   @default("AGENDADA") // AGENDADA | EMITIDA | CANCELANDO | CANCELADA | ERRO
+  number             String?
+  pdfUrl             String?
+  xmlUrl             String?
+  valueCents         Int
   serviceDescription String
-  errorMessage     String?
-  createdAt        DateTime @default(now())
+  errorMessage       String?
+  createdAt          DateTime @default(now())
 
   clinic Clinic @relation(fields: [clinicId], references: [id])
   charge Charge @relation(fields: [chargeId], references: [id])
@@ -799,16 +799,16 @@ model DocumentAcceptance {
 // ---- Convênios (planos de saúde) ----
 
 model Insurer {
-  id           String   @id @default(cuid())
-  clinicId     String
-  name         String
-  cnpj         String?
-  paymentDays  Int      @default(30) // prazo médio de pagamento (dias após o atendimento)
-  sharePercent Int? // % de repasse do profissional neste convênio (null = usa o do profissional)
+  id                String   @id @default(cuid())
+  clinicId          String
+  name              String
+  cnpj              String?
+  paymentDays       Int      @default(30) // prazo médio de pagamento (dias após o atendimento)
+  sharePercent      Int? // % de repasse do profissional neste convênio (null = usa o do profissional)
   gatewayCustomerId String? // cliente no gateway (cus_...), criado ao emitir a nota do lote
-  active       Boolean  @default(true)
-  notes        String?
-  createdAt    DateTime @default(now())
+  active            Boolean  @default(true)
+  notes             String?
+  createdAt         DateTime @default(now())
 
   prices  InsurerPrice[]
   plans   PatientInsurance[]
@@ -820,7 +820,7 @@ model Insurer {
 
 // Tabela de valores: quanto o convênio paga por serviço.
 model InsurerPrice {
-  id         String @id @default(cuid())
+  id         String  @id @default(cuid())
   insurerId  String
   serviceId  String
   priceCents Int
@@ -887,10 +887,10 @@ model InsuranceEntry {
   appealNote     String? // texto do recurso de glosa
   createdAt      DateTime  @default(now())
 
-  insurer     Insurer     @relation(fields: [insurerId], references: [id])
-  batch       InsuranceBatch? @relation(fields: [batchId], references: [id])
+  insurer     Insurer            @relation(fields: [insurerId], references: [id])
+  batch       InsuranceBatch?    @relation(fields: [batchId], references: [id])
   payments    InsurancePayment[]
-  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  appointment Appointment        @relation(fields: [appointmentId], references: [id])
 
   @@index([clinicId, competence])
   @@index([clinicId, status])
@@ -899,21 +899,21 @@ model InsuranceEntry {
 
 // Lote de faturamento: atendimentos de uma competência enviados juntos ao convênio.
 model InsuranceBatch {
-  id            String    @id @default(cuid())
-  clinicId      String
-  insurerId     String
-  competence    String // AAAA-MM
-  number        Int // sequencial por clínica
-  status        String    @default("ABERTO") // ABERTO | ENVIADO
-  sentAt        DateTime?
-  protocol      String? // protocolo de recebimento do convênio
-  invoiceNumber String? // nota fiscal emitida para o convênio (por fora ou integrada na fase 3)
-  invoiceDate   DateTime?
-  invoiceUrl    String?
+  id                String    @id @default(cuid())
+  clinicId          String
+  insurerId         String
+  competence        String // AAAA-MM
+  number            Int // sequencial por clínica
+  status            String    @default("ABERTO") // ABERTO | ENVIADO
+  sentAt            DateTime?
+  protocol          String? // protocolo de recebimento do convênio
+  invoiceNumber     String? // nota fiscal emitida para o convênio (por fora ou integrada na fase 3)
+  invoiceDate       DateTime?
+  invoiceUrl        String?
   invoiceExternalId String? // nota emitida pelo gateway (inv_...), quando emitida pelo sistema
   invoiceStatus     String? // AGENDADA | EMITIDA | CANCELANDO | CANCELADA | ERRO
-  notes         String?
-  createdAt     DateTime  @default(now())
+  notes             String?
+  createdAt         DateTime  @default(now())
 
   insurer Insurer          @relation(fields: [insurerId], references: [id])
   entries InsuranceEntry[]
@@ -971,4 +971,39 @@ model InsurancePayment {
   @@index([entryId])
   @@index([clinicId, paymentMonth])
   @@index([professionalId, paymentMonth])
+}
+
+// ---- Avisos e tarefas do portal ----
+
+// Aviso enviado ao paciente (WhatsApp) sobre uma pendência do portal. Um por item: nunca repete.
+model PortalNotice {
+  id        String   @id @default(cuid())
+  clinicId  String
+  patientId String
+  kind      String // ESCALA | TERMO | TAREFA
+  refId     String // id da escala, do termo ou da tarefa
+  status    String   @default("ENVIADA") // ENVIADA | FALHOU | IGNORADA_SEM_OPTIN
+  createdAt DateTime @default(now())
+
+  @@unique([patientId, kind, refId])
+  @@index([clinicId, createdAt])
+}
+
+// Tarefa entre sessões, combinada pelo profissional e respondida pelo paciente no portal.
+model PatientTask {
+  id             String    @id @default(cuid())
+  clinicId       String
+  patientId      String
+  professionalId String
+  titleEnc       String // criptografado
+  textEnc        String? // instruções (criptografado)
+  dueDate        DateTime?
+  status         String    @default("PENDENTE") // PENDENTE | FEITA | CANCELADA
+  responseEnc    String? // retorno do paciente (criptografado)
+  createdAt      DateTime  @default(now())
+  doneAt         DateTime?
+  seenAt         DateTime? // profissional já viu o retorno
+
+  @@index([clinicId, patientId])
+  @@index([professionalId, status])
 }

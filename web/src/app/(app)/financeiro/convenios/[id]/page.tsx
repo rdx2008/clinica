@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { localDate } from "@/lib/agenda";
 import { formatBRL, shiftMonth, validMonth } from "@/lib/money";
+import { createBatchAction } from "@/app/actions/insurance-batch";
 import { markCompetencePaidAction, markEntryPaidAction, reopenEntryAction, setInsurerPriceAction, updateInsurerAction } from "@/app/actions/insurance";
 import { FinanceTabs } from "@/components/finance-tabs";
 
@@ -12,7 +13,8 @@ export const dynamic = "force-dynamic";
 const input = "rounded border bg-white px-3 py-2 text-sm";
 const btn = "rounded border px-2 py-1 text-xs";
 const STATUS: Record<string, { label: string; style: string }> = {
-  A_FATURAR: { label: "A receber", style: "bg-zinc-100 text-zinc-700" },
+  A_FATURAR: { label: "A faturar", style: "bg-zinc-100 text-zinc-700" },
+  FATURADO: { label: "Faturado", style: "bg-blue-100 text-blue-800" },
   PAGO: { label: "Recebido", style: "bg-emerald-100 text-emerald-800" },
   CANCELADO: { label: "Cancelado", style: "bg-zinc-100 text-zinc-400 line-through" },
 };
@@ -27,9 +29,10 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
 
   const insurer = await db.insurer.findFirst({ where: { id, clinicId: user.clinicId }, include: { prices: true } });
   if (!insurer) notFound();
-  const [services, entries] = await Promise.all([
+  const [services, entries, batches] = await Promise.all([
     db.service.findMany({ where: { clinicId: user.clinicId }, orderBy: { name: "asc" } }),
     db.insuranceEntry.findMany({ where: { clinicId: user.clinicId, insurerId: id, competence: mes }, orderBy: { serviceDate: "asc" } }),
+    db.insuranceBatch.findMany({ where: { clinicId: user.clinicId, insurerId: id }, orderBy: { number: "desc" }, take: 24, include: { _count: { select: { entries: true } } } }),
   ]);
   const [patients, appts] = await Promise.all([
     db.patient.findMany({ where: { id: { in: [...new Set(entries.map((e) => e.patientId))] } }, select: { id: true, fullName: true } }),
@@ -38,9 +41,11 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
   const name = new Map(patients.map((p) => [p.id, p.fullName]));
   const svc = new Map(appts.map((a) => [a.id, a.service.name]));
   const price = new Map(insurer.prices.map((p) => [p.serviceId, p.priceCents]));
+  const tuss = new Map(insurer.prices.map((p) => [p.serviceId, p.tussCode]));
 
   const live = entries.filter((e) => e.status !== "CANCELADO");
-  const open = live.filter((e) => e.status === "A_FATURAR");
+  const toBill = live.filter((e) => e.status === "A_FATURAR");
+  const open = live.filter((e) => e.status === "A_FATURAR" || e.status === "FATURADO");
   const sum = (rows: typeof entries) => rows.reduce((t, e) => t + e.amountCents, 0);
 
   return (
@@ -60,9 +65,17 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
         </div>
         <div className="grid gap-3 text-sm sm:grid-cols-3">
           <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">Atendimentos</p><p className="text-lg font-semibold">{live.length}</p></div>
-          <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">A receber</p><p className="text-lg font-semibold">{formatBRL(sum(open))}</p></div>
+          <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">A receber (faturado ou não)</p><p className="text-lg font-semibold">{formatBRL(sum(open))}</p></div>
           <div className="rounded-xl border p-3"><p className="text-xs text-zinc-500">Recebido</p><p className="text-lg font-semibold text-emerald-700">{formatBRL(sum(live.filter((e) => e.status === "PAGO")))}</p></div>
         </div>
+        {toBill.length > 0 && (
+          <form action={createBatchAction} className="flex flex-wrap items-center gap-2 text-sm">
+            <input type="hidden" name="insurerId" value={id} />
+            <input type="hidden" name="mes" value={mes} />
+            <button className="rounded border border-emerald-700 px-3 py-2 text-sm text-emerald-800">Fechar lote de {mes.split("-").reverse().join("/")} ({toBill.length} atendimento(s))</button>
+            <span className="text-xs text-zinc-500">Numera as guias e prepara o resumo para envio e para o contador.</span>
+          </form>
+        )}
         {open.length > 0 && (
           <form action={markCompetencePaidAction} className="flex flex-wrap items-end gap-2 text-sm">
             <input type="hidden" name="insurerId" value={id} />
@@ -79,13 +92,14 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
                 <p className="font-medium">{name.get(e.patientId) ?? "Paciente"}</p>
                 <p className="text-xs text-zinc-500">
                   {fmt(e.serviceDate)} · {svc.get(e.appointmentId) ?? "Atendimento"} · previsão {fmt(e.expectedDate)}
+                  {e.guideNumber && ` · guia ${e.guideNumber}`}
                   {e.paidAt && ` · recebido em ${fmt(e.paidAt)}`}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-medium">{formatBRL(e.amountCents)}</span>
                 <span className={`rounded px-2 py-0.5 text-xs ${STATUS[e.status]?.style}`}>{STATUS[e.status]?.label ?? e.status}</span>
-                {e.status === "A_FATURAR" && (
+                {(e.status === "A_FATURAR" || e.status === "FATURADO") && (
                   <form action={markEntryPaidAction}>
                     <input type="hidden" name="id" value={e.id} />
                     <input type="hidden" name="date" value={today} />
@@ -105,8 +119,29 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
       </section>
 
       <section className="space-y-3 rounded border bg-white p-4">
+        <h2>Lotes</h2>
+        {batches.length === 0 ? (
+          <p className="text-sm text-zinc-500">Nenhum lote ainda. Feche o lote de uma competência acima.</p>
+        ) : (
+          <ul className="divide-y text-sm">
+            {batches.map((b) => (
+              <li key={b.id}>
+                <Link href={`/financeiro/convenios/${id}/lote/${b.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2 hover:underline">
+                  <span>Lote {b.number} · {b.competence.split("-").reverse().join("/")} · {b._count.entries} guia(s)</span>
+                  <span className="flex items-center gap-2 text-xs">
+                    {b.invoiceNumber && <span className="rounded bg-violet-100 px-2 py-0.5 text-violet-800">nota {b.invoiceNumber}</span>}
+                    <span className={`rounded px-2 py-0.5 ${b.status === "ENVIADO" ? "bg-blue-100 text-blue-800" : "bg-zinc-100 text-zinc-700"}`}>{b.status === "ENVIADO" ? "enviado" : "aberto"}</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded border bg-white p-4">
         <h2>Valores por serviço</h2>
-        <p className="text-xs text-zinc-500">Quanto este convênio paga por atendimento. Serviço sem valor não pode ser agendado por este convênio.</p>
+        <p className="text-xs text-zinc-500">Quanto este convênio paga por atendimento. Serviço sem valor não pode ser agendado por este convênio. O código TUSS é opcional e aparece nas guias do lote.</p>
         <ul className="divide-y text-sm">
           {services.map((s) => (
             <li key={s.id}>
@@ -115,6 +150,7 @@ export default async function InsurerPage({ params, searchParams }: { params: Pr
                 <input type="hidden" name="serviceId" value={s.id} />
                 <span>{s.name} <span className="text-xs text-zinc-500">(particular {formatBRL(s.priceCents)})</span></span>
                 <span className="flex items-center gap-2">
+                  <input name="tuss" defaultValue={tuss.get(s.id) ?? ""} placeholder="TUSS" aria-label="Código TUSS" className={`${input} w-24`} />
                   <input name="price" defaultValue={price.has(s.id) ? ((price.get(s.id) ?? 0) / 100).toFixed(2).replace(".", ",") : ""} placeholder="sem valor" inputMode="decimal" className={`${input} w-28`} />
                   <button className={btn}>Salvar</button>
                 </span>

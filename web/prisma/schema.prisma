@@ -810,6 +810,7 @@ model Insurer {
   prices  InsurerPrice[]
   plans   PatientInsurance[]
   entries InsuranceEntry[]
+  batches InsuranceBatch[]
 
   @@unique([clinicId, name])
 }
@@ -820,6 +821,7 @@ model InsurerPrice {
   insurerId  String
   serviceId  String
   priceCents Int
+  tussCode   String? // código do procedimento na tabela TUSS, quando o convênio exige
 
   insurer Insurer @relation(fields: [insurerId], references: [id], onDelete: Cascade)
 
@@ -873,15 +875,41 @@ model InsuranceEntry {
   serviceDate    DateTime
   competence     String // AAAA-MM do atendimento
   expectedDate   DateTime // previsão de pagamento
-  status         String    @default("A_FATURAR") // A_FATURAR | PAGO | CANCELADO (faturado/glosado entram na fase 2/3)
+  status         String    @default("A_FATURAR") // A_FATURAR | FATURADO | PAGO | CANCELADO (glosa entra na fase 3)
   paidAt         DateTime?
   paymentMonth   String? // AAAA-MM do recebimento (base do repasse)
+  batchId        String?
+  guideNumber    String? // número da guia dentro do lote
   createdAt      DateTime  @default(now())
 
   insurer     Insurer     @relation(fields: [insurerId], references: [id])
+  batch       InsuranceBatch? @relation(fields: [batchId], references: [id])
   appointment Appointment @relation(fields: [appointmentId], references: [id])
 
   @@index([clinicId, competence])
   @@index([clinicId, status])
   @@index([professionalId, paymentMonth])
+}
+
+// Lote de faturamento: atendimentos de uma competência enviados juntos ao convênio.
+model InsuranceBatch {
+  id            String    @id @default(cuid())
+  clinicId      String
+  insurerId     String
+  competence    String // AAAA-MM
+  number        Int // sequencial por clínica
+  status        String    @default("ABERTO") // ABERTO | ENVIADO
+  sentAt        DateTime?
+  protocol      String? // protocolo de recebimento do convênio
+  invoiceNumber String? // nota fiscal emitida para o convênio (por fora ou integrada na fase 3)
+  invoiceDate   DateTime?
+  invoiceUrl    String?
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  insurer Insurer          @relation(fields: [insurerId], references: [id])
+  entries InsuranceEntry[]
+
+  @@unique([clinicId, number])
+  @@index([insurerId, competence])
 }

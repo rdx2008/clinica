@@ -91,10 +91,12 @@ export async function setInsurerPriceAction(formData: FormData) {
   } else {
     const cents = parseBRL(raw);
     if (cents === null || cents <= 0) return back("Valor inválido.");
+    const tuss = String(formData.get("tuss") ?? "").trim();
+    if (tuss && !/^[0-9A-Za-z.\-]{1,20}$/.test(tuss)) return back("Código TUSS inválido.");
     await db.insurerPrice.upsert({
       where: { insurerId_serviceId: { insurerId, serviceId } },
-      create: { insurerId, serviceId, priceCents: cents },
-      update: { priceCents: cents },
+      create: { insurerId, serviceId, priceCents: cents, tussCode: tuss || null },
+      update: { priceCents: cents, tussCode: tuss || null },
     });
   }
   await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_VALOR_ALTERADO", entity: "Insurer", entityId: insurerId });
@@ -178,7 +180,7 @@ export async function markEntryPaidAction(formData: FormData) {
   const id = String(formData.get("id") ?? "");
   const e = await db.insuranceEntry.findFirst({ where: { id, clinicId: user.clinicId } });
   if (!e) redirect("/financeiro/convenios");
-  if (e.status === "A_FATURAR") {
+  if (e.status === "A_FATURAR" || e.status === "FATURADO") {
     const paidAt = paymentDate(String(formData.get("date") ?? ""));
     await db.insuranceEntry.update({ where: { id }, data: { status: "PAGO", paidAt, paymentMonth: paidAt.toISOString().slice(0, 7) } });
     await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_RECEBIDO", entity: "InsuranceEntry", entityId: id });
@@ -197,7 +199,7 @@ export async function markCompetencePaidAction(formData: FormData) {
   if (!insurer) redirect("/financeiro/convenios");
   const paidAt = paymentDate(String(formData.get("date") ?? ""));
   const r = await db.insuranceEntry.updateMany({
-    where: { clinicId: user.clinicId, insurerId, competence: mes, status: "A_FATURAR" },
+    where: { clinicId: user.clinicId, insurerId, competence: mes, status: { in: ["A_FATURAR", "FATURADO"] } },
     data: { status: "PAGO", paidAt, paymentMonth: paidAt.toISOString().slice(0, 7) },
   });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_COMPETENCIA_RECEBIDA", entity: "Insurer", entityId: insurerId });
@@ -216,7 +218,7 @@ export async function reopenEntryAction(formData: FormData) {
     const closed = await db.payout.findFirst({ where: { clinicId: user.clinicId, professionalId: e.professionalId, period: e.paymentMonth }, select: { id: true } });
     if (closed) return back("O repasse do mês do recebimento já foi fechado.");
   }
-  await db.insuranceEntry.update({ where: { id }, data: { status: "A_FATURAR", paidAt: null, paymentMonth: null } });
+  await db.insuranceEntry.update({ where: { id }, data: { status: e.batchId ? "FATURADO" : "A_FATURAR", paidAt: null, paymentMonth: null } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "CONVENIO_ESTORNADO", entity: "InsuranceEntry", entityId: id });
   redirect(`/financeiro/convenios/${e.insurerId}?mes=${e.competence}`);
 }

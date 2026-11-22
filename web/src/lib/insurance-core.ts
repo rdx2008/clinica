@@ -9,6 +9,11 @@ export function expectedPayDate(serviceDate: string, days: number): Date {
   return d;
 }
 
+// Número da guia: lote + sequência (ex.: 12-007).
+export function guideNumber(batchNumber: number, seq: number): string {
+  return `${batchNumber}-${String(seq).padStart(3, "0")}`;
+}
+
 export type AuthCheck = { ok: true; remaining: number } | { ok: false; reason: string };
 
 // A autorização cobre mais um atendimento na data informada?

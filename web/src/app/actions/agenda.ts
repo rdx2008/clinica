@@ -185,6 +185,15 @@ async function loadAppointment(user: Actor, id: string) {
   return a;
 }
 
+// Atendimento de convênio já faturado em lote ou recebido não muda de status nem de data.
+async function billingLock(appointmentId: string): Promise<string | null> {
+  const e = await db.insuranceEntry.findUnique({ where: { appointmentId }, select: { status: true, guideNumber: true } });
+  if (!e) return null;
+  if (e.status === "FATURADO") return `Atendimento já faturado (guia ${e.guideNumber}). Tire-o do lote em Financeiro → Convênios antes de alterar.`;
+  if (e.status === "PAGO") return "Atendimento já recebido do convênio. Estorne o recebimento em Financeiro → Convênios antes de alterar.";
+  return null;
+}
+
 function backToDetail(id: string, msg?: string): never {
   redirect(`/agenda/${id}${msg ? `?erro=${encodeURIComponent(msg)}` : ""}`);
 }
@@ -201,6 +210,10 @@ export async function setStatusAction(formData: FormData) {
   const reactivating = (a.status === "CANCELADA" || a.status === "REMARCADA") && status !== "CANCELADA";
   if (reactivating && (await hasConflict(a.professionalId, [{ startsAt: a.startsAt, endsAt: a.endsAt }], a.id))) {
     backToDetail(id, CONFLICT);
+  }
+  if (status !== "COMPARECEU" && a.patientInsuranceId) {
+    const lock = await billingLock(id);
+    if (lock) backToDetail(id, lock);
   }
   try {
     const reason = String(formData.get("reason") ?? "").trim().slice(0, 200);
@@ -265,6 +278,10 @@ export async function rescheduleAction(formData: FormData) {
   if (!a) redirect("/agenda");
   const start = parseLocal(String(formData.get("date") ?? ""), String(formData.get("time") ?? ""));
   if (!start) backToDetail(id, "Data ou horário inválido.");
+  if (a.patientInsuranceId) {
+    const lock = await billingLock(id);
+    if (lock) backToDetail(id, lock);
+  }
   const end = new Date(start.getTime() + (a.endsAt.getTime() - a.startsAt.getTime()));
 
   if (formData.get("outside") !== "on") {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkAuth, expectedPayDate, payoutShare } from "../src/lib/insurance-core.ts";
+import { checkAuth, expectedPayDate, guideNumber, payoutShare } from "../src/lib/insurance-core.ts";
 
 test("previsão de pagamento soma o prazo do convênio", () => {
   assert.equal(expectedPayDate("2026-11-20", 30).toISOString().slice(0, 10), "2026-12-20");
@@ -28,4 +28,9 @@ test("repasse: particular e convênio com percentuais diferentes", () => {
 
 test("repasse sem convênio mantém o cálculo atual", () => {
   assert.deepEqual(payoutShare(12345, 33, []), { grossCents: 12345, shareCents: Math.round((12345 * 33) / 100) });
+});
+
+test("numero da guia: lote e sequencia", () => {
+  assert.equal(guideNumber(12, 7), "12-007");
+  assert.equal(guideNumber(1, 120), "1-120");
 });

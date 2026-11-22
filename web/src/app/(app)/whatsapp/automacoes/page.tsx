@@ -7,15 +7,16 @@ import {
   setTemplateStatusAction,
   toggleAutomationAction,
 } from "@/app/actions/whatsapp";
+import { syncTemplatesAction } from "@/app/actions/whatsapp2";
 
 export const dynamic = "force-dynamic";
 
 const input = "rounded border px-3 py-2 text-sm";
 const btn = "rounded border px-2 py-1 text-xs";
 
-export default async function AutomationsPage({ searchParams }: { searchParams: Promise<{ erro?: string }> }) {
+export default async function AutomationsPage({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
   const user = await requireRole("ADMIN");
-  const { erro } = await searchParams;
+  const { erro, ok } = await searchParams;
   const [templates, automations] = await Promise.all([
     db.waTemplate.findMany({ where: { clinicId: user.clinicId }, orderBy: { name: "asc" } }),
     db.automation.findMany({ where: { clinicId: user.clinicId }, include: { template: { select: { name: true, status: true } } } }),
@@ -26,12 +27,16 @@ export default async function AutomationsPage({ searchParams }: { searchParams: 
       <Link href="/whatsapp" className="text-xs text-zinc-500 underline">← Conversas</Link>
       <h1 className="text-xl font-semibold">Modelos e lembretes</h1>
       {erro && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
+      {ok && <p role="status" className="rounded bg-emerald-50 p-3 text-sm text-emerald-800">{ok}</p>}
 
       <section className="space-y-3 rounded border p-4">
-        <h2 className="font-medium">Modelos de mensagem</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-medium">Modelos de mensagem</h2>
+          <form action={syncTemplatesAction}><button className="rounded border px-3 py-1.5 text-sm">Sincronizar com a Meta</button></form>
+        </div>
         <p className="text-xs text-zinc-500">
           Crie o modelo no Gerenciador do WhatsApp (Meta) e registre aqui o mesmo nome e texto. Só modelos marcados como aprovados são usados.
-          Variáveis nos lembretes: {"{{1}}"} nome, {"{{2}}"} data, {"{{3}}"} hora, {"{{4}}"} profissional.
+          Variáveis nos lembretes: {"{{1}}"} nome, {"{{2}}"} data, {"{{3}}"} hora, {"{{4}}"} profissional. Dica: termine o texto com “Responda 1 para confirmar ou 2 para cancelar” — a resposta confirma a consulta automaticamente.
         </p>
         <ul className="divide-y text-sm">
           {templates.length === 0 && <li className="py-2 text-zinc-500">Nenhum modelo.</li>}

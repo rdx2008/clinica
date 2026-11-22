@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; match?: string };
+export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; match?: string; badge?: number };
 export type NavGroup = { title?: string; items: NavItem[] };
 
 // Ícones de traço (24x24), no estilo "lucide".
@@ -45,7 +45,8 @@ export function NavLinks({ groups }: { groups: NavGroup[] }) {
               <li key={it.href}>
                 <Link href={it.href} className="nav-link" aria-current={isActive(it) ? "page" : undefined}>
                   <Icon name={it.icon} />
-                  {it.label}
+                  <span className="flex-1">{it.label}</span>
+                  {!!it.badge && <span className="rounded-full bg-emerald-300 px-1.5 text-[11px] font-semibold text-emerald-950">{it.badge > 99 ? "99+" : it.badge}</span>}
                 </Link>
               </li>
             ))}

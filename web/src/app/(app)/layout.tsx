@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
+import { db } from "@/lib/db";
 import { MFA_REQUIRED, requireUser } from "@/lib/session";
 import { BrandMark } from "@/components/brand";
 import { CommandPalette } from "@/components/command-palette";
@@ -29,7 +30,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     main.push({ href: "/agenda/semana", match: "/agenda", label: "Agenda", icon: "calendar" }, { href: "/pacientes", label: "Pacientes", icon: "users" });
   }
   const ops: NavItem[] = [];
-  if (r === "ADMIN" || r === "RECEPCAO") ops.push({ href: "/whatsapp", label: "WhatsApp", icon: "chat" });
+  if (r === "ADMIN" || r === "RECEPCAO") {
+    const unread = await db.waConversation.aggregate({ where: { clinicId: user.clinicId }, _sum: { unread: true } });
+    ops.push({ href: "/whatsapp", label: "WhatsApp", icon: "chat", badge: unread._sum.unread ?? 0 });
+  }
   if (r !== "PROFISSIONAL") ops.push({ href: "/financeiro", label: "Financeiro", icon: "wallet" });
   const admin: NavItem[] =
     r === "ADMIN"

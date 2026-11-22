@@ -1,6 +1,7 @@
 import { after } from "next/server";
 import { Prisma } from "@prisma/client";
 import { handleInbound } from "@/lib/ai-runner";
+import { handleConfirmationReply } from "@/lib/wa-confirm";
 import { db } from "@/lib/db";
 import { encryptField } from "@/lib/crypto";
 import { isStopKeyword, parseWebhook, verifySignature, waToE164, WINDOW_MS } from "@/lib/whatsapp";
@@ -45,8 +46,8 @@ export async function POST(request: Request) {
       const now = new Date();
       const conv = await db.waConversation.upsert({
         where: { clinicId_waContact: { clinicId, waContact: phone } },
-        create: { clinicId, waContact: phone, patientId: patient?.id ?? null, lastMsgAt: m.at, windowExpiresAt: new Date(m.at.getTime() + WINDOW_MS) },
-        update: { lastMsgAt: m.at, windowExpiresAt: new Date(m.at.getTime() + WINDOW_MS), ...(patient ? { patientId: patient.id } : {}) },
+        create: { clinicId, waContact: phone, patientId: patient?.id ?? null, lastMsgAt: m.at, windowExpiresAt: new Date(m.at.getTime() + WINDOW_MS), unread: 1 },
+        update: { lastMsgAt: m.at, windowExpiresAt: new Date(m.at.getTime() + WINDOW_MS), unread: { increment: 1 }, ...(patient ? { patientId: patient.id } : {}) },
       });
 
       try {
@@ -94,6 +95,8 @@ export async function POST(request: Request) {
     after(async () => {
       for (const item of forAi) {
         try {
+          // Confirmação/cancelamento por resposta curta tem prioridade; o resto vai para a IA (se ligada).
+          if (await handleConfirmationReply(item.conversationId, item.text)) continue;
           await handleInbound(item.conversationId, item.text);
         } catch {
           // falha da IA nunca derruba o webhook; a conversa segue para atendimento humano

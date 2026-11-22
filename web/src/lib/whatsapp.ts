@@ -154,3 +154,21 @@ export async function sendText(params: { token: string; phoneNumberId: string; t
     return { ok: false, error: "Não foi possível falar com o WhatsApp. Tente novamente." };
   }
 }
+
+// Resposta curta a um lembrete de consulta: confirma, pede cancelamento ou nenhuma das duas.
+// Só aceita respostas curtas e inequívocas, para não interpretar uma conversa normal.
+export function parseConfirmationReply(text: string | null): "CONFIRMA" | "CANCELA" | null {
+  if (!text) return null;
+  const t = text
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9 ]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const yes = ["1", "sim", "s", "confirmo", "confirmar", "confirmado", "ok", "pode confirmar", "estarei la", "estarei presente", "com certeza"];
+  const no = ["2", "nao", "n", "cancelar", "cancela", "nao vou", "nao posso", "nao poderei", "preciso cancelar", "desmarcar", "preciso remarcar", "remarcar"];
+  if (yes.includes(t)) return "CONFIRMA";
+  if (no.includes(t)) return "CANCELA";
+  return null;
+}

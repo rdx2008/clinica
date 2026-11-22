@@ -126,6 +126,7 @@ export default async function PatientPage({
             <Link href={`/agenda/novo?patient=${p.id}`} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">Agendar</Link>
           )}
           {user.role === "PROFISSIONAL" && <Link href={`/pacientes/${p.id}/prontuario`} className="rounded border px-3 py-2 text-sm">Prontuário</Link>}
+          {user.role !== "PROFISSIONAL" && p.phoneE164 && optinActive && <Link href={`/whatsapp/nova?patient=${p.id}`} className="rounded border px-3 py-2 text-sm">WhatsApp</Link>}
           <Link href={`/pacientes/${p.id}/editar`} className="rounded border px-3 py-2 text-sm">Editar</Link>
           <form action={setPatientStatusAction}>
             <input type="hidden" name="patientId" value={p.id} />

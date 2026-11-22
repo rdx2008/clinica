@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
-import { isStopKeyword, parseWebhook, verifySignature, waToE164, windowOpen } from "../src/lib/whatsapp.ts";
+import { isStopKeyword, parseConfirmationReply, parseWebhook, verifySignature, waToE164, windowOpen } from "../src/lib/whatsapp.ts";
 
 test("assinatura do webhook: válida, adulterada e ausente", () => {
   const body = '{"a":1}';
@@ -63,4 +63,16 @@ test("janela de 24h", () => {
   assert.ok(windowOpen(new Date("2026-01-01T13:00:00Z"), now));
   assert.ok(!windowOpen(new Date("2026-01-01T11:00:00Z"), now));
   assert.ok(!windowOpen(null, now));
+});
+
+test("resposta ao lembrete: confirma, cancela e ignora conversa normal", () => {
+  assert.equal(parseConfirmationReply("1"), "CONFIRMA");
+  assert.equal(parseConfirmationReply(" Sim! "), "CONFIRMA");
+  assert.equal(parseConfirmationReply("Confirmo."), "CONFIRMA");
+  assert.equal(parseConfirmationReply("2"), "CANCELA");
+  assert.equal(parseConfirmationReply("Não posso"), "CANCELA");
+  assert.equal(parseConfirmationReply("Preciso remarcar"), "CANCELA");
+  assert.equal(parseConfirmationReply("Sim, mas qual o endereço?"), null);
+  assert.equal(parseConfirmationReply("Oi, tudo bem?"), null);
+  assert.equal(parseConfirmationReply(null), null);
 });

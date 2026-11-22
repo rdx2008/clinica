@@ -94,6 +94,7 @@ model Clinic {
   waitlist      WaitlistEntry[]
   recordTemplates RecordTemplate[]
   expenses      Expense[]
+  quickReplies  QuickReply[]
   auditLogs     AuditLog[]
   importJobs    ImportJob[]
 }
@@ -408,11 +409,13 @@ model WaConversation {
   aiState         AiState  @default(ATIVA)
   lastMsgAt       DateTime @default(now())
   windowExpiresAt DateTime?
+  unread          Int      @default(0)
 
   clinic   Clinic       @relation(fields: [clinicId], references: [id])
   patient  Patient?     @relation(fields: [patientId], references: [id])
   messages WaMessage[]
   aiEvents AiEvent[]
+  notes    WaNote[]
 
   @@unique([clinicId, waContact])
   @@index([clinicId, lastMsgAt])
@@ -596,4 +599,30 @@ model Expense {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@index([clinicId, date])
+}
+
+// Nota interna da equipe sobre uma conversa (nunca enviada ao paciente).
+model WaNote {
+  id             String   @id @default(cuid())
+  conversationId String
+  authorId       String
+  body           String // criptografado
+  createdAt      DateTime @default(now())
+
+  conversation WaConversation @relation(fields: [conversationId], references: [id])
+
+  @@index([conversationId])
+}
+
+// Respostas rápidas da recepção.
+model QuickReply {
+  id        String   @id @default(cuid())
+  clinicId  String
+  title     String
+  body      String
+  createdAt DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId])
 }

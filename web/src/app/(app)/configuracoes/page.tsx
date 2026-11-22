@@ -2,6 +2,8 @@ import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { formatPhoneBR } from "@/lib/br";
 import { professionalColor } from "@/lib/agenda";
+import { demoExists } from "@/lib/demo";
+import { createDemoAction, removeDemoAction } from "@/app/actions/demo";
 import { createRoomAction, removeRoomAction, saveClinicAction, setProfessionalColorAction } from "@/app/actions/settings";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +14,7 @@ const btn = "rounded border px-2 py-1 text-xs";
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ erro?: string; ok?: string }> }) {
   const admin = await requireRole("ADMIN");
   const sp = await searchParams;
+  const hasDemo = await demoExists(admin.clinicId);
   const [clinic, rooms, professionals] = await Promise.all([
     db.clinic.findUniqueOrThrow({ where: { id: admin.clinicId } }),
     db.room.findMany({ where: { clinicId: admin.clinicId }, orderBy: { name: "asc" }, include: { _count: { select: { appointments: true } } } }),
@@ -90,6 +93,22 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             </li>
           ))}
         </ul>
+      </section>
+
+      <section className="space-y-3 rounded border p-5">
+        <h2>Dados de demonstração</h2>
+        <p className="text-sm text-zinc-600">
+          Cria profissionais, pacientes, agenda, cobranças, despesas e conversas de exemplo para você conhecer o sistema. Tudo fica marcado como demonstração e pode ser removido de uma vez, sem afetar dados reais.
+        </p>
+        {hasDemo ? (
+          <form action={removeDemoAction}>
+            <button className="rounded border border-red-300 px-4 py-2 text-sm text-red-700">Remover dados de demonstração</button>
+          </form>
+        ) : (
+          <form action={createDemoAction}>
+            <button className="rounded border px-4 py-2 text-sm">Criar dados de demonstração</button>
+          </form>
+        )}
       </section>
     </div>
   );

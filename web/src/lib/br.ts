@@ -59,3 +59,17 @@ export function normalizeName(s: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+// CPF válido determinístico (apenas para dados de demonstração e testes).
+export function generateValidCpf(seed: number): string {
+  const base = String(100000000 + ((seed * 7919) % 899999999)).slice(0, 9);
+  const calc = (digits: number[]) => {
+    let sum = 0;
+    for (let i = 0; i < digits.length; i++) sum += digits[i] * (digits.length + 1 - i);
+    return ((sum * 10) % 11) % 10;
+  };
+  const nums = [...base].map(Number);
+  const d1 = calc(nums);
+  const d2 = calc([...nums, d1]);
+  return `${base}${d1}${d2}`;
+}

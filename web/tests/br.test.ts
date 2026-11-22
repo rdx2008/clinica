@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidCpf, maskCpf, normalizePhoneBR, formatPhoneBR, normalizeName, ageYears } from "../src/lib/br.ts";
+import { isValidCpf, maskCpf, normalizePhoneBR, formatPhoneBR, normalizeName, ageYears, generateValidCpf } from "../src/lib/br.ts";
 
 test("idade: antes e depois do aniversário", () => {
   const birth = new Date("2000-06-15T00:00:00.000Z");
@@ -37,4 +37,9 @@ test("telefone: formatação de exibição", () => {
 
 test("nome: normalização ignora acento, caixa e espaços", () => {
   assert.equal(normalizeName("  José   da  SILVA "), "jose da silva");
+});
+
+test("CPF gerado para demonstração é válido e determinístico", () => {
+  for (let i = 0; i < 40; i++) assert.ok(isValidCpf(generateValidCpf(i)), String(i));
+  assert.equal(generateValidCpf(5), generateValidCpf(5));
 });

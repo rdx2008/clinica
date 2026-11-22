@@ -112,7 +112,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
         {plans.length === 0 ? (
           <p className="text-sm text-zinc-600">Nenhum modelo de pacote cadastrado. {canConfigure ? <Link href="/financeiro/pacotes/modelos" className="underline">Criar modelos</Link> : "Peça ao financeiro para cadastrar os modelos."}</p>
         ) : (
-          <form action={sellPlanAction} className="grid gap-3 sm:grid-cols-2">
+          <form key={`${sp.pedido ?? ""}-${sp.paciente ?? ""}-${sp.plano ?? ""}`} action={sellPlanAction} className="grid gap-3 sm:grid-cols-2">
             {sp.pedido && <input type="hidden" name="requestId" value={sp.pedido} />}
             <label className="text-sm sm:col-span-2">Paciente
               <select name="patientId" required defaultValue={sp.paciente ?? ""} className={input}>

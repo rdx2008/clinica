@@ -19,12 +19,10 @@ export function LoginForm() {
       </label>
       {state.needsCode && (
         <label className="flex flex-col gap-1 text-sm">
-          Código do aplicativo autenticador
+          Código do aplicativo autenticador (ou código de backup)
           <input
             name="code"
-            inputMode="numeric"
-            pattern="[0-9 ]{6,7}"
-            maxLength={7}
+            maxLength={12}
             required
             autoFocus
             autoComplete="one-time-code"

@@ -2,11 +2,17 @@
 
 import { useActionState } from "react";
 import { enableMfaAction, type FormState } from "@/app/actions/auth";
+import { BackupCodesView } from "@/components/backup-codes-view";
 
 const initial: FormState = {};
 
 export function MfaForm({ secret }: { secret: string }) {
   const [state, action, pending] = useActionState(enableMfaAction, initial);
+
+  if (state.backupCodes) {
+    return <BackupCodesView codes={state.backupCodes} continueHref="/dashboard" />;
+  }
+
   return (
     <form action={action} className="flex flex-col gap-4">
       <input type="hidden" name="secret" value={secret} />

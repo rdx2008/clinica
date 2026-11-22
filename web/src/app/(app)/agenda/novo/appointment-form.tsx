@@ -10,6 +10,7 @@ export function AppointmentForm({
   patients,
   professionals,
   services,
+  rooms,
   defaults,
   idempotencyKey,
   lockProfessional,
@@ -18,6 +19,7 @@ export function AppointmentForm({
   patients: { id: string; fullName: string }[];
   professionals: { id: string; name: string }[];
   services: { id: string; name: string; durationMin: number; modality: string }[];
+  rooms: { id: string; name: string }[];
   defaults: { date: string; professionalId: string; patientId: string };
   idempotencyKey: string;
   lockProfessional: boolean;
@@ -56,6 +58,14 @@ export function AppointmentForm({
           <input type="time" name="time" required className={input} />
         </label>
       </div>
+      {rooms.length > 0 && (
+        <label className="block text-sm">Sala (opcional)
+          <select name="roomId" defaultValue="" className={input}>
+            <option value="">Sem sala</option>
+            {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </select>
+        </label>
+      )}
       <label className="block text-sm">Repetir semanalmente (número de sessões)
         <input type="number" name="repeat" min={1} max={52} defaultValue={1} className={input} />
         <span className="text-xs text-zinc-500">1 = sessão única. Se qualquer data da série estiver ocupada, nenhuma é criada.</span>

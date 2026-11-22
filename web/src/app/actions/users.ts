@@ -1,5 +1,7 @@
 "use server";
 
+import { createHash, randomBytes } from "node:crypto";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -7,7 +9,9 @@ import { Prisma, type Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { createSession, getCurrentUser, requireRole } from "@/lib/session";
-import { audit } from "@/lib/audit";
+import { audit, clientIp } from "@/lib/audit";
+import { generateBackupCodes } from "@/lib/backup-codes";
+import { clearFailures, registerFailure, tooManyAttempts } from "@/lib/rate-limit";
 import type { FormState } from "./auth";
 
 const ROLES = ["ADMIN", "RECEPCAO", "PROFISSIONAL", "FINANCEIRO"] as const;
@@ -153,4 +157,80 @@ export async function changePasswordAction(_prev: FormState, formData: FormData)
   await audit({ clinicId: user.clinicId, userId: user.id, action: "SENHA_ALTERADA", entity: "User", entityId: user.id });
   await createSession(user.id); // outras sessões foram derrubadas; esta continua
   redirect("/dashboard");
+}
+
+// ---- Link de redefinição de senha (sem e-mail): o administrador gera e entrega ao usuário ----
+
+const RESET_TTL_MS = 60 * 60_000; // 1 hora
+
+function sha256(v: string): string {
+  return createHash("sha256").update(v).digest("hex");
+}
+
+export async function createResetLinkAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const admin = await requireRole("ADMIN");
+  const target = await db.user.findFirst({ where: { id: String(formData.get("userId") ?? ""), clinicId: admin.clinicId } });
+  if (!target) return { error: "Usuário não encontrado." };
+
+  const token = randomBytes(32).toString("base64url");
+  await db.user.update({
+    where: { id: target.id },
+    data: { resetTokenHash: sha256(token), resetTokenExpires: new Date(Date.now() + RESET_TTL_MS) },
+  });
+  await audit({ clinicId: admin.clinicId, userId: admin.id, action: "LINK_REDEFINICAO_GERADO", entity: "User", entityId: target.id });
+
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  const proto = h.get("x-forwarded-proto") ?? "https";
+  return { link: `${proto}://${host}/redefinir/${token}` };
+}
+
+const redeemSchema = z.object({
+  token: z.string().min(20),
+  password: z.string().min(12, "A senha deve ter ao menos 12 caracteres"),
+  confirm: z.string(),
+});
+
+export async function redeemResetAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const key = `reset|${await clientIp()}`;
+  if (tooManyAttempts(key, 10)) return { error: "Muitas tentativas. Aguarde alguns minutos." };
+  const parsed = redeemSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+  if (parsed.data.password !== parsed.data.confirm) return { error: "As senhas não coincidem." };
+
+  const user = await db.user.findFirst({
+    where: { resetTokenHash: sha256(parsed.data.token), resetTokenExpires: { gt: new Date() }, active: true },
+  });
+  if (!user) {
+    registerFailure(key);
+    return { error: "Link inválido ou expirado. Peça um novo ao administrador." };
+  }
+  await db.user.update({
+    where: { id: user.id },
+    data: {
+      passwordHash: await hashPassword(parsed.data.password),
+      mustChangePassword: false,
+      resetTokenHash: null,
+      resetTokenExpires: null,
+      sessionsValidAfter: new Date(),
+    },
+  });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "SENHA_REDEFINIDA_POR_LINK", entity: "User", entityId: user.id });
+  clearFailures(key);
+  redirect("/login?redefinida=1");
+}
+
+// ---- Códigos de backup do MFA ----
+
+export async function regenerateBackupCodesAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+  if (!user.mfaSecret) return { error: "Ative a verificação em duas etapas antes." };
+  const row = await db.user.findUniqueOrThrow({ where: { id: user.id }, select: { passwordHash: true } });
+  if (!(await verifyPassword(String(formData.get("password") ?? ""), row.passwordHash))) return { error: "Senha incorreta." };
+
+  const { codes, hashes } = generateBackupCodes();
+  await db.user.update({ where: { id: user.id }, data: { mfaBackupHashes: hashes } });
+  await audit({ clinicId: user.clinicId, userId: user.id, action: "CODIGOS_BACKUP_REGERADOS", entity: "User", entityId: user.id });
+  return { backupCodes: codes };
 }

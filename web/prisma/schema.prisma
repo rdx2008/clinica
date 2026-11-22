@@ -69,6 +69,9 @@ model Clinic {
   id        String   @id @default(cuid())
   name      String
   cnpj      String?
+  phone     String?
+  email     String?
+  address   String?
   timezone  String   @default("America/Sao_Paulo")
   settings  Json     @default("{}")
   createdAt DateTime @default(now())
@@ -103,6 +106,9 @@ model User {
   active       Boolean  @default(true)
   mustChangePassword Boolean @default(false)
   sessionsValidAfter DateTime? // sessões emitidas antes disso são recusadas
+  mfaBackupHashes    String[]  @default([]) // hashes (sha256) de códigos de backup do MFA
+  resetTokenHash     String? // hash do link de redefinição de senha
+  resetTokenExpires  DateTime?
   createdAt    DateTime @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
@@ -119,6 +125,7 @@ model Professional {
   councilNumber     String?
   specialty         String?
   defaultMeetingUrl String?
+  color             String? // cor na agenda (#rrggbb)
 
   clinic       Clinic         @relation(fields: [clinicId], references: [id])
   user         User           @relation(fields: [userId], references: [id])

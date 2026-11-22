@@ -51,6 +51,7 @@ const createSchema = z.object({
   time: z.string(),
   repeat: z.coerce.number().int().min(1).max(MAX_RECURRENCE).default(1),
   meetingUrl: z.string().trim().optional(),
+  roomId: z.string().optional(),
   idempotencyKey: z.string().min(8).max(100),
 });
 
@@ -77,6 +78,13 @@ export async function createAppointmentAction(_prev: AppointmentFormState, formD
   if (!start) return { error: "Data ou horário inválido." };
   const end = new Date(start.getTime() + service.durationMin * 60_000);
   const occurrences = weeklyOccurrences(start, end, d.repeat);
+
+  let roomId: string | null = null;
+  if (d.roomId) {
+    const room = await db.room.findFirst({ where: { id: d.roomId, clinicId: user.clinicId }, select: { id: true } });
+    if (!room) return { error: "Sala não encontrada." };
+    roomId = room.id;
+  }
 
   let meetingUrl: string | null = null;
   if (service.modality === "ONLINE") {
@@ -113,6 +121,7 @@ export async function createAppointmentAction(_prev: AppointmentFormState, formD
             startsAt: o.startsAt,
             endsAt: o.endsAt,
             recurrenceId: recurrence?.id ?? null,
+            roomId,
             source: "MANUAL",
             meetingUrl,
             idempotencyKey: `${d.idempotencyKey}-${i}`,

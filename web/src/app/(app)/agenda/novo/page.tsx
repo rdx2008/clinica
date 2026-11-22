@@ -17,7 +17,7 @@ export default async function NewAppointmentPage({
   const sp = await searchParams;
   const term = (sp.q ?? "").trim();
 
-  const [professionals, services, patients, preset] = await Promise.all([
+  const [professionals, services, patients, preset, rooms] = await Promise.all([
     db.professional.findMany({
       where: { clinicId: user.clinicId, ...(user.role === "PROFISSIONAL" ? { userId: user.id } : {}), user: { active: true } },
       include: { user: { select: { name: true } } },
@@ -33,6 +33,7 @@ export default async function NewAppointmentPage({
     sp.patient
       ? db.patient.findFirst({ where: { id: sp.patient, clinicId: user.clinicId, status: "ATIVO" }, select: { id: true, fullName: true } })
       : null,
+    db.room.findMany({ where: { clinicId: user.clinicId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);
 
   const list = preset && !patients.some((p) => p.id === preset.id) ? [preset, ...patients] : patients;
@@ -68,6 +69,7 @@ export default async function NewAppointmentPage({
             professionalId: professionals.find((p) => p.id === sp.prof)?.id ?? professionals[0].id,
             patientId: preset?.id ?? "",
           }}
+          rooms={rooms}
           idempotencyKey={randomUUID()}
           lockProfessional={user.role === "PROFISSIONAL"}
         />

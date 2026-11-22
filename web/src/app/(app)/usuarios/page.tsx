@@ -7,6 +7,7 @@ import {
   setActiveAction,
   setRoleAction,
 } from "@/app/actions/users";
+import { ResetLink } from "./reset-link";
 
 export const dynamic = "force-dynamic";
 
@@ -91,6 +92,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     <input name="password" type="password" placeholder="Nova senha provisória" minLength={12} required autoComplete="new-password" className={input} />
                     <button className={btn}>Redefinir senha</button>
                   </form>
+                  <ResetLink userId={u.id} />
                 </div>
               )}
             </article>

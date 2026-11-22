@@ -98,3 +98,10 @@ export function withinAvailability(start: Date, end: Date, windows: Window[]): b
   const e = localTime(end);
   return windows.some((w) => w.weekday === wd && s >= w.startTime && e <= w.endTime);
 }
+
+// Paleta usada quando o profissional ainda não escolheu cor na agenda.
+export const DEFAULT_COLORS = ["#0f6b5d", "#2563eb", "#9333ea", "#db2777", "#ea580c", "#ca8a04", "#0891b2", "#4b5563"];
+
+export function professionalColor(color: string | null | undefined, index: number): string {
+  return color ?? DEFAULT_COLORS[index % DEFAULT_COLORS.length];
+}

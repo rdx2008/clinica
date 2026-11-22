@@ -7,6 +7,7 @@ import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { decryptField, encryptField } from "@/lib/crypto";
 import { verifyTotp } from "@/lib/totp";
+import { consumeBackupCode, generateBackupCodes, looksLikeBackupCode } from "@/lib/backup-codes";
 import { createSession, destroySession, getCurrentUser, MFA_REQUIRED } from "@/lib/session";
 import { audit, clientIp } from "@/lib/audit";
 import { clearFailures, registerFailure, tooManyAttempts } from "@/lib/rate-limit";
@@ -17,7 +18,7 @@ function safeEqual(a: string, b: string): boolean {
   return x.length === y.length && timingSafeEqual(x, y);
 }
 
-export type FormState = { error?: string; needsCode?: boolean };
+export type FormState = { error?: string; needsCode?: boolean; backupCodes?: string[]; link?: string; ok?: string };
 
 const setupSchema = z.object({
   clinicName: z.string().trim().min(2, "Informe o nome da clínica"),
@@ -85,7 +86,19 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 
   if (user.mfaSecret) {
     if (!code) return { needsCode: true };
-    if (!verifyTotp(decryptField(user.mfaSecret), code)) {
+    let ok = false;
+    if (looksLikeBackupCode(code)) {
+      // Código de backup (uso único): serve quando o celular não está disponível.
+      const left = consumeBackupCode(user.mfaBackupHashes, code);
+      if (left) {
+        await db.user.update({ where: { id: user.id }, data: { mfaBackupHashes: left } });
+        await audit({ clinicId: user.clinicId, userId: user.id, action: "LOGIN_CODIGO_BACKUP", entity: "User", entityId: user.id });
+        ok = true;
+      }
+    } else {
+      ok = verifyTotp(decryptField(user.mfaSecret), code);
+    }
+    if (!ok) {
       registerFailure(key);
       registerFailure(emailKey);
       await audit({ clinicId: user.clinicId, userId: user.id, action: "LOGIN_MFA_FALHA", entity: "User", entityId: user.id });
@@ -116,7 +129,9 @@ export async function enableMfaAction(_prev: FormState, formData: FormData): Pro
   if (!/^[A-Z2-7]{32}$/.test(secret) || !verifyTotp(secret, code)) {
     return { error: "Código inválido. Confira o aplicativo e tente de novo." };
   }
-  await db.user.update({ where: { id: user.id }, data: { mfaSecret: encryptField(secret) } });
+  const { codes, hashes } = generateBackupCodes();
+  await db.user.update({ where: { id: user.id }, data: { mfaSecret: encryptField(secret), mfaBackupHashes: hashes } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "MFA_ATIVADO", entity: "User", entityId: user.id });
-  redirect("/dashboard");
+  // Mostra os códigos de backup uma única vez; o formulário oferece o botão "Continuar".
+  return { backupCodes: codes };
 }

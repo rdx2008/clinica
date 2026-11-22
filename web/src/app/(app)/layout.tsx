@@ -35,10 +35,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? [
           { href: "/servicos", label: "Serviços", icon: "list" },
           { href: "/usuarios", label: "Usuários", icon: "stethoscope" },
+          { href: "/configuracoes", label: "Configurações", icon: "settings" },
           { href: "/auditoria", label: "Auditoria", icon: "shield" },
         ]
       : [];
-  const account: NavItem[] = [{ href: "/conta/senha", label: "Minha senha", icon: "key" }];
+  const account: NavItem[] = [{ href: "/conta/seguranca", label: "Segurança", icon: "key" }];
   const groups: NavGroup[] = (
     [
       { items: main },

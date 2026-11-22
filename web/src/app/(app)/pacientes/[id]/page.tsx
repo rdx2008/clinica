@@ -18,6 +18,7 @@ import {
 import { anonymizePatientAction } from "@/app/actions/patients-admin";
 import { PortalLink } from "./portal-link";
 import { acceptTermInPersonAction } from "@/app/actions/terms";
+import { patientScope } from "@/lib/clinical";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,7 @@ export default async function PatientPage({
   const aba = ["resumo", "atendimentos", "financeiro", "dados"].includes(sp.aba ?? "") ? (sp.aba as string) : "resumo";
 
   const p = await db.patient.findFirst({
-    where: { id, clinicId: user.clinicId },
+    where: { id, clinicId: user.clinicId, AND: [patientScope(user)] },
     include: {
       guardians: { orderBy: { name: "asc" } },
       contacts: { orderBy: { name: "asc" } },

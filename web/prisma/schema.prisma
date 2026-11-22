@@ -188,6 +188,7 @@ model Patient {
   status            String    @default("ATIVO")
   dedupeKey         String? // hash normalizado (nome + nascimento + telefone)
   createdAt         DateTime  @default(now())
+  createdByUserId   String? // quem cadastrou; um profissional vê os pacientes que cadastrou
 
   clinic        Clinic              @relation(fields: [clinicId], references: [id])
   guardians     Guardian[]

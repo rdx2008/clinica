@@ -8,6 +8,7 @@ import { blindIndex, encryptField } from "@/lib/crypto";
 import { isValidCpf, normalizeName, normalizePhoneBR, onlyDigits } from "@/lib/br";
 import { requireRole } from "@/lib/session";
 import { audit } from "@/lib/audit";
+import { patientScope } from "@/lib/clinical";
 
 export type PatientFormState = {
   error?: string;
@@ -125,6 +126,7 @@ export async function createPatientAction(_prev: PatientFormState, formData: For
   const patient = await db.patient.create({
     data: {
       clinicId: user.clinicId,
+      createdByUserId: user.id,
       fullName: v.fullName,
       birthDate: v.birthDate,
       cpfEnc: v.cpfDigits ? encryptField(v.cpfDigits) : null,
@@ -158,7 +160,7 @@ export async function createPatientAction(_prev: PatientFormState, formData: For
 export async function updatePatientAction(_prev: PatientFormState, formData: FormData): Promise<PatientFormState> {
   const user = await requireRole(...ALLOWED);
   const id = String(formData.get("id") ?? "");
-  const current = await db.patient.findFirst({ where: { id, clinicId: user.clinicId }, select: { id: true } });
+  const current = await db.patient.findFirst({ where: { id, clinicId: user.clinicId, AND: [patientScope(user)] }, select: { id: true } });
   if (!current) return { error: "Paciente não encontrado." };
 
   const parsed = parseCommon(formData);
@@ -199,16 +201,16 @@ function backTo(id: string, msg?: string): never {
   redirect(`/pacientes/${id}${msg ? `?erro=${encodeURIComponent(msg)}` : ""}`);
 }
 
-async function ownedPatient(userClinicId: string, formData: FormData) {
+async function ownedPatient(user: { id: string; role: string; clinicId: string }, formData: FormData) {
   const id = String(formData.get("patientId") ?? "");
-  const p = await db.patient.findFirst({ where: { id, clinicId: userClinicId }, select: { id: true, phoneE164: true } });
+  const p = await db.patient.findFirst({ where: { id, clinicId: user.clinicId, AND: [patientScope(user)] }, select: { id: true, phoneE164: true } });
   if (!p) redirect("/pacientes");
   return p;
 }
 
 export async function addGuardianAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
-  const p = await ownedPatient(user.clinicId, formData);
+  const p = await ownedPatient(user, formData);
   const name = String(formData.get("name") ?? "").trim();
   if (name.length < 2) backTo(p.id, "Informe o nome do responsável.");
   const phoneRaw = String(formData.get("phone") ?? "").trim();
@@ -229,7 +231,7 @@ export async function addGuardianAction(formData: FormData) {
 
 export async function removeGuardianAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
-  const p = await ownedPatient(user.clinicId, formData);
+  const p = await ownedPatient(user, formData);
   await db.guardian.deleteMany({ where: { id: String(formData.get("id") ?? ""), patientId: p.id } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "RESPONSAVEL_REMOVIDO", entity: "Patient", entityId: p.id });
   backTo(p.id);
@@ -237,7 +239,7 @@ export async function removeGuardianAction(formData: FormData) {
 
 export async function addContactAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
-  const p = await ownedPatient(user.clinicId, formData);
+  const p = await ownedPatient(user, formData);
   const name = String(formData.get("name") ?? "").trim();
   const phone = normalizePhoneBR(String(formData.get("phone") ?? ""));
   if (name.length < 2) backTo(p.id, "Informe o nome do contato autorizado.");
@@ -251,7 +253,7 @@ export async function addContactAction(formData: FormData) {
 
 export async function removeContactAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
-  const p = await ownedPatient(user.clinicId, formData);
+  const p = await ownedPatient(user, formData);
   await db.authorizedContact.deleteMany({ where: { id: String(formData.get("id") ?? ""), patientId: p.id } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: "CONTATO_AUTORIZADO_REMOVIDO", entity: "Patient", entityId: p.id });
   backTo(p.id);
@@ -260,7 +262,7 @@ export async function removeContactAction(formData: FormData) {
 // Concede ou revoga o opt-in de WhatsApp (histórico preservado: revogação preenche revokedAt).
 export async function setWhatsappOptinAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
-  const p = await ownedPatient(user.clinicId, formData);
+  const p = await ownedPatient(user, formData);
   const grant = formData.get("grant") === "true";
   if (grant) {
     if (!p.phoneE164) backTo(p.id, "Cadastre um telefone antes de registrar o opt-in.");
@@ -274,7 +276,7 @@ export async function setWhatsappOptinAction(formData: FormData) {
 
 export async function setPatientStatusAction(formData: FormData) {
   const user = await requireRole(...ALLOWED);
-  const p = await ownedPatient(user.clinicId, formData);
+  const p = await ownedPatient(user, formData);
   const status = formData.get("status") === "INATIVO" ? "INATIVO" : "ATIVO";
   await db.patient.update({ where: { id: p.id }, data: { status } });
   await audit({ clinicId: user.clinicId, userId: user.id, action: `PACIENTE_${status}`, entity: "Patient", entityId: p.id });

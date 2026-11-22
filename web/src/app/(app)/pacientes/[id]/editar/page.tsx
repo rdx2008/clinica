@@ -4,13 +4,14 @@ import { db } from "@/lib/db";
 import { formatPhoneBR } from "@/lib/br";
 import { requireRole } from "@/lib/session";
 import { PatientForm } from "../../patient-form";
+import { patientScope } from "@/lib/clinical";
 
 export const dynamic = "force-dynamic";
 
 export default async function EditPatientPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await requireRole("ADMIN", "RECEPCAO", "PROFISSIONAL");
   const { id } = await params;
-  const p = await db.patient.findFirst({ where: { id, clinicId: user.clinicId } });
+  const p = await db.patient.findFirst({ where: { id, clinicId: user.clinicId, AND: [patientScope(user)] } });
   if (!p) notFound();
   return (
     <div className="space-y-4">

@@ -5,6 +5,7 @@ import { audit } from "@/lib/audit";
 import { formatPhoneBR } from "@/lib/br";
 import { fillTerm } from "@/lib/terms-templates";
 import { PrintButton } from "@/components/print-button";
+import { patientScope } from "@/lib/clinical";
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +14,7 @@ export default async function PrintTermPage({ params }: { params: Promise<{ id: 
   const user = await requireRole("ADMIN", "RECEPCAO", "PROFISSIONAL");
   const { id, docId } = await params;
   const [patient, doc, clinic] = await Promise.all([
-    db.patient.findFirst({ where: { id, clinicId: user.clinicId }, select: { fullName: true } }),
+    db.patient.findFirst({ where: { id, clinicId: user.clinicId, AND: [patientScope(user)] }, select: { fullName: true } }),
     db.clinicDocument.findFirst({ where: { id: docId, clinicId: user.clinicId } }),
     db.clinic.findUniqueOrThrow({ where: { id: user.clinicId } }),
   ]);

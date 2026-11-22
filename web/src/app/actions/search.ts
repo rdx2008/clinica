@@ -3,6 +3,7 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { formatPhoneBR, onlyDigits } from "@/lib/br";
+import { patientScope } from "@/lib/clinical";
 
 export type SearchHit = { kind: "paciente" | "pagina"; label: string; hint?: string; href: string };
 
@@ -53,6 +54,7 @@ export async function globalSearchAction(query: string): Promise<SearchHit[]> {
     const rows = await db.patient.findMany({
       where: {
         clinicId: user.clinicId,
+        AND: [patientScope(user)],
         OR: [{ fullName: { contains: q, mode: "insensitive" } }, ...(digits.length >= 4 ? [{ phoneE164: { contains: digits } }] : [])],
       },
       orderBy: { fullName: "asc" },

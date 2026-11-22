@@ -10,6 +10,7 @@ import { audit } from "@/lib/audit";
 import { parseBRL } from "@/lib/money";
 import { checkAuth, expectedPayDate } from "@/lib/insurance-core";
 import { ACTIVE_STATUSES, localDate, withinAvailability, parseLocal, validMeetingUrl, weeklyOccurrences, MAX_RECURRENCE } from "@/lib/agenda";
+import { patientScope } from "@/lib/clinical";
 
 export type AppointmentFormState = { error?: string };
 
@@ -70,7 +71,7 @@ export async function createAppointmentAction(_prev: AppointmentFormState, formD
   if (own === "__none__") return { error: "Seu usuário não tem perfil de profissional." };
 
   const [patient, professional, service] = await Promise.all([
-    db.patient.findFirst({ where: { id: d.patientId, clinicId: user.clinicId, status: "ATIVO" }, select: { id: true } }),
+    db.patient.findFirst({ where: { id: d.patientId, clinicId: user.clinicId, status: "ATIVO", AND: [patientScope(user)] }, select: { id: true } }),
     db.professional.findFirst({ where: { id: professionalId, clinicId: user.clinicId }, select: { id: true, defaultMeetingUrl: true } }),
     db.service.findFirst({ where: { id: d.serviceId, clinicId: user.clinicId } }),
   ]);

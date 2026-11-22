@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { requireRole } from "@/lib/session";
 import { formatPhoneBR, onlyDigits } from "@/lib/br";
+import { patientScope } from "@/lib/clinical";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,7 @@ export default async function PatientsPage({
   const where = {
     clinicId: user.clinicId,
     status,
+    AND: [patientScope(user)],
     ...(tag ? { tags: { has: tag } } : {}),
     ...(term
       ? {
@@ -39,7 +41,7 @@ export default async function PatientsPage({
       select: { id: true, fullName: true, phoneE164: true, tags: true, birthDate: true },
     }),
     db.patient.count({ where }),
-    db.patient.findMany({ where: { clinicId: user.clinicId, status }, select: { tags: true }, take: 1000 }),
+    db.patient.findMany({ where: { clinicId: user.clinicId, status, AND: [patientScope(user)] }, select: { tags: true }, take: 1000 }),
   ]);
   const allTags = [...new Set(tagRows.flatMap((r) => r.tags))].sort().slice(0, 20);
   const link = (t: string) => `/pacientes?${new URLSearchParams({ ...(term ? { q: term } : {}), ...(inativos ? { inativos: "1" } : {}), ...(t ? { tag: t } : {}) })}`;

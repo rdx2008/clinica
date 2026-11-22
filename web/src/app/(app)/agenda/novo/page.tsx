@@ -5,6 +5,7 @@ import { requireRole } from "@/lib/session";
 import { localDate } from "@/lib/agenda";
 import { createAppointmentAction } from "@/app/actions/agenda";
 import { AppointmentForm } from "./appointment-form";
+import { patientScope } from "@/lib/clinical";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +26,13 @@ export default async function NewAppointmentPage({
     }),
     db.service.findMany({ where: { clinicId: user.clinicId }, orderBy: { name: "asc" } }),
     db.patient.findMany({
-      where: { clinicId: user.clinicId, status: "ATIVO", ...(term ? { fullName: { contains: term, mode: "insensitive" } } : {}) },
+      where: { clinicId: user.clinicId, status: "ATIVO", AND: [patientScope(user)], ...(term ? { fullName: { contains: term, mode: "insensitive" } } : {}) },
       orderBy: { fullName: "asc" },
       take: 50,
       select: { id: true, fullName: true },
     }),
     sp.patient
-      ? db.patient.findFirst({ where: { id: sp.patient, clinicId: user.clinicId, status: "ATIVO" }, select: { id: true, fullName: true } })
+      ? db.patient.findFirst({ where: { id: sp.patient, clinicId: user.clinicId, status: "ATIVO", AND: [patientScope(user)] }, select: { id: true, fullName: true } })
       : null,
     db.room.findMany({ where: { clinicId: user.clinicId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
   ]);

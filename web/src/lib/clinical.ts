@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { db } from "./db";
 import { requireRole } from "./session";
 
@@ -23,13 +24,28 @@ export async function requireClinician() {
   return { user, professionalId: professional.id };
 }
 
-// O profissional pode abrir o prontuário se atende (ou atendeu) o paciente ou já registrou algo nele.
+// Quais pacientes cada perfil enxerga. Administração e recepção veem todos; o profissional vê
+// só os que atende (ou atendeu), os que já têm registro dele e os que ele mesmo cadastrou.
+// Use dentro de `AND: [patientScope(user)]` em consultas de Patient.
+export function patientScope(user: { id: string; role: string }): Prisma.PatientWhereInput {
+  if (user.role !== "PROFISSIONAL") return {};
+  return {
+    OR: [
+      { createdByUserId: user.id },
+      { appointments: { some: { status: { not: "CANCELADA" }, professional: { userId: user.id } } } },
+      { records: { some: { professional: { userId: user.id } } } },
+    ],
+  };
+}
+
+// O profissional pode abrir o paciente se atende (ou atendeu), já registrou algo nele ou o cadastrou.
 export async function canAccessPatient(clinicId: string, professionalId: string, patientId: string): Promise<boolean> {
-  const patient = await db.patient.findFirst({ where: { id: patientId, clinicId }, select: { id: true } });
+  const patient = await db.patient.findFirst({ where: { id: patientId, clinicId }, select: { id: true, createdByUserId: true } });
   if (!patient) return false;
-  const [appt, rec] = await Promise.all([
+  const [appt, rec, prof] = await Promise.all([
     db.appointment.findFirst({ where: { clinicId, patientId, professionalId, status: { not: "CANCELADA" } }, select: { id: true } }),
     db.clinicalRecord.findFirst({ where: { clinicId, patientId, professionalId }, select: { id: true } }),
+    patient.createdByUserId ? db.professional.findUnique({ where: { id: professionalId }, select: { userId: true } }) : null,
   ]);
-  return !!(appt || rec);
+  return !!(appt || rec || (prof && prof.userId === patient.createdByUserId));
 }

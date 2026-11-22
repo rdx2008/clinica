@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/session";
 import { audit, clientIp } from "@/lib/audit";
 import { TERM_TEMPLATES } from "@/lib/terms-templates";
 import { getPortalSession, patientsForEmail } from "@/lib/portal";
+import { patientScope } from "@/lib/clinical";
 
 const KIND = ["TCLE", "CONTRATO", "OUTRO"];
 
@@ -102,7 +103,7 @@ export async function acceptTermInPersonAction(formData: FormData) {
   const patientId = String(formData.get("patientId") ?? "");
   const back2 = (m?: string): never => redirect(`/pacientes/${patientId}?aba=dados${m ? `&erro=${encodeURIComponent(m)}` : ""}`);
   const [patient, doc] = await Promise.all([
-    db.patient.findFirst({ where: { id: patientId, clinicId: user.clinicId }, select: { id: true } }),
+    db.patient.findFirst({ where: { id: patientId, clinicId: user.clinicId, AND: [patientScope(user)] }, select: { id: true } }),
     db.clinicDocument.findFirst({ where: { id: String(formData.get("docId") ?? ""), clinicId: user.clinicId, active: true } }),
   ]);
   if (!patient || !doc) return back2("Paciente ou documento não encontrado.");

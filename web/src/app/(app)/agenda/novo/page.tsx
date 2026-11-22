@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function NewAppointmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; prof?: string; patient?: string; q?: string }>;
+  searchParams: Promise<{ date?: string; prof?: string; patient?: string; q?: string; time?: string }>;
 }) {
   const user = await requireRole("ADMIN", "RECEPCAO", "PROFISSIONAL");
   const sp = await searchParams;
@@ -47,6 +47,7 @@ export default async function NewAppointmentPage({
       <form className="flex gap-2">
         <input type="hidden" name="date" value={date} />
         {sp.prof && <input type="hidden" name="prof" value={sp.prof} />}
+        {sp.time && <input type="hidden" name="time" value={sp.time} />}
         <input name="q" defaultValue={term} placeholder="Buscar paciente pelo nome" className="flex-1 rounded border px-3 py-2 text-sm" />
         <button className="rounded border px-3 py-2 text-sm">Buscar</button>
       </form>
@@ -66,6 +67,7 @@ export default async function NewAppointmentPage({
           services={services.map((s) => ({ id: s.id, name: s.name, durationMin: s.durationMin, modality: s.modality }))}
           defaults={{
             date,
+            time: /^\d{2}:\d{2}$/.test(sp.time ?? "") ? (sp.time as string) : "",
             professionalId: professionals.find((p) => p.id === sp.prof)?.id ?? professionals[0].id,
             patientId: preset?.id ?? "",
           }}

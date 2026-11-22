@@ -20,7 +20,7 @@ export function AppointmentForm({
   professionals: { id: string; name: string }[];
   services: { id: string; name: string; durationMin: number; modality: string }[];
   rooms: { id: string; name: string }[];
-  defaults: { date: string; professionalId: string; patientId: string };
+  defaults: { date: string; time: string; professionalId: string; patientId: string };
   idempotencyKey: string;
   lockProfessional: boolean;
 }) {
@@ -55,7 +55,7 @@ export function AppointmentForm({
           <input type="date" name="date" required defaultValue={defaults.date} className={input} />
         </label>
         <label className="block text-sm">Horário
-          <input type="time" name="time" required className={input} />
+          <input type="time" name="time" required defaultValue={defaults.time} className={input} />
         </label>
       </div>
       {rooms.length > 0 && (

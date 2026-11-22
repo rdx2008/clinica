@@ -91,6 +91,7 @@ model Clinic {
   charges       Charge[]
   packages      Package[]
   payouts       Payout[]
+  waitlist      WaitlistEntry[]
   auditLogs     AuditLog[]
   importJobs    ImportJob[]
 }
@@ -182,6 +183,7 @@ model Patient {
   records      ClinicalRecord[]
   conversations WaConversation[]
   charges      Charge[]
+  waitlist     WaitlistEntry[]
   packages     Package[]
 
   @@index([clinicId, fullName])
@@ -282,6 +284,8 @@ model Appointment {
   source         String? // WHATSAPP | IA | MANUAL
   idempotencyKey String?           @unique
   meetingUrl     String?
+  cancelReason   String?
+  cancelledAt    DateTime?
   createdAt      DateTime          @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
@@ -523,4 +527,21 @@ model AuditLog {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@index([clinicId, createdAt])
+}
+
+model WaitlistEntry {
+  id             String   @id @default(cuid())
+  clinicId       String
+  patientId      String
+  professionalId String?
+  serviceId      String?
+  preference     String? // dias/horários preferidos, texto livre
+  notes          String?
+  status         String   @default("ABERTA") // ABERTA | ATENDIDA | REMOVIDA
+  createdAt      DateTime @default(now())
+
+  clinic  Clinic  @relation(fields: [clinicId], references: [id])
+  patient Patient @relation(fields: [patientId], references: [id])
+
+  @@index([clinicId, status])
 }

@@ -105,3 +105,53 @@ export const DEFAULT_COLORS = ["#0f6b5d", "#2563eb", "#9333ea", "#db2777", "#ea5
 export function professionalColor(color: string | null | undefined, index: number): string {
   return color ?? DEFAULT_COLORS[index % DEFAULT_COLORS.length];
 }
+
+// ---- Visão semanal ----
+
+// Segunda-feira da semana de uma data local (YYYY-MM-DD).
+export function weekStart(date: string): string {
+  const d = new Date(`${date}T12:00:00.000-03:00`);
+  const wd = d.getUTCDay(); // 0 = domingo
+  return addDays(date, wd === 0 ? -6 : 1 - wd);
+}
+
+export function weekDays(date: string): string[] {
+  const start = weekStart(date);
+  return Array.from({ length: 7 }, (_, i) => addDays(start, i));
+}
+
+export function minutesOfDay(d: Date): number {
+  const t = localTime(d);
+  return Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+}
+
+// Distribui eventos sobrepostos em "faixas" lado a lado (como em agendas de calendário).
+// Retorna, para cada id, a faixa (lane) e o total de faixas do grupo de eventos que se tocam.
+export function layoutLanes(events: { id: string; start: number; end: number }[]): Map<string, { lane: number; lanes: number }> {
+  const sorted = [...events].sort((a, b) => a.start - b.start || b.end - a.end);
+  const result = new Map<string, { lane: number; lanes: number }>();
+  let group: { id: string; lane: number }[] = [];
+  let groupEnd = -1;
+  let laneEnds: number[] = [];
+
+  const flush = () => {
+    for (const g of group) result.set(g.id, { lane: g.lane, lanes: laneEnds.length });
+    group = [];
+    laneEnds = [];
+  };
+
+  for (const e of sorted) {
+    if (group.length && e.start >= groupEnd) flush();
+    let lane = laneEnds.findIndex((end) => end <= e.start);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(e.end);
+    } else {
+      laneEnds[lane] = e.end;
+    }
+    group.push({ id: e.id, lane });
+    groupEnd = Math.max(groupEnd, e.end);
+  }
+  flush();
+  return result;
+}

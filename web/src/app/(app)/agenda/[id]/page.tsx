@@ -86,14 +86,29 @@ export default async function AppointmentPage({
       <section className="space-y-2 rounded border p-4">
         <h2 className="font-medium">Status</h2>
         <div className="flex flex-wrap gap-2">
-          {statuses.map((s) => (
+          {statuses.filter((s) => s !== "CANCELADA").map((s) => (
             <form key={s} action={setStatusAction}>
               <input type="hidden" name="id" value={a.id} />
               <input type="hidden" name="status" value={s} />
               <button className={btn}>{s === "AGENDADA" ? "Voltar para agendada" : STATUS_LABEL[s]}</button>
             </form>
           ))}
+          {a.status !== "CANCELADA" && (
+            <form action={setStatusAction} className="flex items-center gap-1">
+              <input type="hidden" name="id" value={a.id} />
+              <input type="hidden" name="status" value="CANCELADA" />
+              <select name="reason" className={input} defaultValue="" aria-label="Motivo do cancelamento">
+                <option value="">Cancelar — motivo…</option>
+                <option>Paciente desmarcou</option>
+                <option>Profissional indisponível</option>
+                <option>Remarcado pela clínica</option>
+                <option>Outro</option>
+              </select>
+              <button className={btn}>Cancelar</button>
+            </form>
+          )}
         </div>
+        {a.status === "CANCELADA" && a.cancelReason && <p className="text-sm text-zinc-600">Motivo do cancelamento: {a.cancelReason}</p>}
         <p className="text-xs text-zinc-500">Cancelar libera o horário na agenda.</p>
       </section>
 

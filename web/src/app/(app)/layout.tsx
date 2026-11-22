@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { logoutAction } from "@/app/actions/auth";
 import { MFA_REQUIRED, requireUser } from "@/lib/session";
 import { BrandMark } from "@/components/brand";
+import { CommandPalette } from "@/components/command-palette";
 import { NavLinks, type NavGroup, type NavItem } from "@/components/nav";
 
 const ROLE_LABEL = {
@@ -25,7 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const r = user.role;
   const main: NavItem[] = [{ href: "/dashboard", label: "Início", icon: "home" }];
   if (r !== "FINANCEIRO") {
-    main.push({ href: "/agenda", label: "Agenda", icon: "calendar" }, { href: "/pacientes", label: "Pacientes", icon: "users" });
+    main.push({ href: "/agenda/semana", match: "/agenda", label: "Agenda", icon: "calendar" }, { href: "/pacientes", label: "Pacientes", icon: "users" });
   }
   const ops: NavItem[] = [];
   if (r === "ADMIN" || r === "RECEPCAO") ops.push({ href: "/whatsapp", label: "WhatsApp", icon: "chat" });
@@ -87,6 +88,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {/* barra lateral (telas grandes) */}
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-emerald-900 px-3 py-4 lg:flex">
         <div className="px-2 pb-2">{brand}</div>
+        <div className="mt-2 px-1"><CommandPalette /></div>
         <div className="mt-2 flex-1 overflow-y-auto pr-1">
           <NavLinks groups={groups} />
         </div>
@@ -106,6 +108,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               </span>
             </summary>
             <div className="max-h-[75vh] overflow-y-auto border-t border-white/10 px-3 pb-4">
+              <div className="py-3"><CommandPalette /></div>
               <NavLinks groups={groups} />
               <div className="pt-4">{userBlock}</div>
             </div>

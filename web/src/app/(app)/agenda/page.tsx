@@ -55,7 +55,13 @@ export default async function AgendaPage({
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Agenda</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">Agenda</h1>
+          <div className="inline-flex overflow-hidden rounded-lg border bg-white text-sm shadow-sm">
+            <Link href={`/agenda/semana?date=${date}${selected ? `&prof=${selected.id}` : ""}`} className="px-3 py-1 hover:bg-zinc-50">Semana</Link>
+            <span className="bg-emerald-700 px-3 py-1 font-medium text-white">Dia</span>
+          </div>
+        </div>
         {selected && serviceCount > 0 && (
           <Link href={`/agenda/novo?date=${date}&prof=${selected.id}`} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white">
             Novo agendamento

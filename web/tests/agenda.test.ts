@@ -68,3 +68,39 @@ test("disponibilidade semanal: dentro, fora e sem janelas", () => {
   assert.ok(!withinAvailability(parseLocal("2026-11-18", "11:30")!, parseLocal("2026-11-18", "12:20")!, wins)); // passa do fim
   assert.ok(!withinAvailability(parseLocal("2026-11-19", "09:00")!, parseLocal("2026-11-19", "09:50")!, wins)); // outro dia
 });
+
+import { layoutLanes, minutesOfDay, weekDays, weekStart } from "../src/lib/agenda.ts";
+
+test("semana começa na segunda e tem 7 dias", () => {
+  // 2026-11-18 é quarta; a segunda é 2026-11-16
+  assert.equal(weekStart("2026-11-18"), "2026-11-16");
+  assert.equal(weekStart("2026-11-16"), "2026-11-16");
+  assert.equal(weekStart("2026-11-22"), "2026-11-16"); // domingo pertence à semana que começou na segunda anterior
+  assert.deepEqual(weekDays("2026-11-18"), ["2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22"]);
+});
+
+test("minutos do dia no fuso da clínica", () => {
+  assert.equal(minutesOfDay(parseLocal("2026-11-18", "14:30")!), 14 * 60 + 30);
+  assert.equal(minutesOfDay(parseLocal("2026-11-18", "00:05")!), 5);
+});
+
+test("faixas: eventos sobrepostos ficam lado a lado, os demais usam largura total", () => {
+  const m = layoutLanes([
+    { id: "a", start: 540, end: 600 },
+    { id: "b", start: 570, end: 630 },
+    { id: "c", start: 700, end: 760 },
+  ]);
+  assert.deepEqual(m.get("a"), { lane: 0, lanes: 2 });
+  assert.deepEqual(m.get("b"), { lane: 1, lanes: 2 });
+  assert.deepEqual(m.get("c"), { lane: 0, lanes: 1 });
+});
+
+test("faixas: reaproveita faixa livre", () => {
+  const m = layoutLanes([
+    { id: "a", start: 540, end: 660 },
+    { id: "b", start: 540, end: 570 },
+    { id: "c", start: 580, end: 640 },
+  ]);
+  assert.equal(m.get("a")!.lanes, 2);
+  assert.equal(m.get("c")!.lane, 1); // ocupa a faixa que "b" liberou
+});

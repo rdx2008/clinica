@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export type NavItem = { href: string; label: string; icon: keyof typeof ICONS };
+export type NavItem = { href: string; label: string; icon: keyof typeof ICONS; match?: string };
 export type NavGroup = { title?: string; items: NavItem[] };
 
 // Ícones de traço (24x24), no estilo "lucide".
@@ -31,6 +31,7 @@ export function Icon({ name, className = "h-[18px] w-[18px]" }: { name: keyof ty
 export function NavLinks({ groups }: { groups: NavGroup[] }) {
   const pathname = usePathname();
   const active = (href: string) => (href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(`${href}/`));
+  const isActive = (it: NavItem) => active(it.match ?? it.href);
   return (
     <nav aria-label="Principal">
       {groups.map((g, i) => (
@@ -39,7 +40,7 @@ export function NavLinks({ groups }: { groups: NavGroup[] }) {
           <ul className="space-y-0.5">
             {g.items.map((it) => (
               <li key={it.href}>
-                <Link href={it.href} className="nav-link" aria-current={active(it.href) ? "page" : undefined}>
+                <Link href={it.href} className="nav-link" aria-current={isActive(it) ? "page" : undefined}>
                   <Icon name={it.icon} />
                   {it.label}
                 </Link>

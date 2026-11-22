@@ -168,7 +168,15 @@ export async function setStatusAction(formData: FormData) {
     backToDetail(id, CONFLICT);
   }
   try {
-    await db.appointment.update({ where: { id }, data: { status: status as AppointmentStatus } });
+    const reason = String(formData.get("reason") ?? "").trim().slice(0, 200);
+    await db.appointment.update({
+      where: { id },
+      data: {
+        status: status as AppointmentStatus,
+        cancelReason: status === "CANCELADA" ? reason || null : null,
+        cancelledAt: status === "CANCELADA" ? new Date() : null,
+      },
+    });
   } catch (e) {
     if (isOverlapError(e)) backToDetail(id, CONFLICT);
     throw e;

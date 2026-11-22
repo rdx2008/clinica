@@ -93,6 +93,7 @@ model Clinic {
   payouts       Payout[]
   waitlist      WaitlistEntry[]
   recordTemplates RecordTemplate[]
+  expenses      Expense[]
   auditLogs     AuditLog[]
   importJobs    ImportJob[]
 }
@@ -128,6 +129,7 @@ model Professional {
   specialty         String?
   defaultMeetingUrl String?
   color             String? // cor na agenda (#rrggbb)
+  sharePercent      Int     @default(0) // % de repasse sobre o recebido
 
   clinic       Clinic         @relation(fields: [clinicId], references: [id])
   user         User           @relation(fields: [userId], references: [id])
@@ -294,6 +296,7 @@ model Appointment {
   meetingUrl     String?
   cancelReason   String?
   cancelledAt    DateTime?
+  packageId      String?
   createdAt      DateTime          @default(now())
 
   clinic       Clinic        @relation(fields: [clinicId], references: [id])
@@ -302,6 +305,7 @@ model Appointment {
   service      Service       @relation(fields: [serviceId], references: [id])
   room         Room?         @relation(fields: [roomId], references: [id])
   recurrence   Recurrence?   @relation(fields: [recurrenceId], references: [id])
+  package      Package?      @relation(fields: [packageId], references: [id])
   records      ClinicalRecord[]
   charges      Charge[]
   runs         AutomationRun[]
@@ -506,10 +510,12 @@ model Package {
   sessionsTotal Int
   sessionsUsed  Int    @default(0)
   priceCents    Int
+  createdAt     DateTime @default(now())
 
-  clinic  Clinic  @relation(fields: [clinicId], references: [id])
-  patient Patient @relation(fields: [patientId], references: [id])
-  service Service @relation(fields: [serviceId], references: [id])
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  patient      Patient       @relation(fields: [patientId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  appointments Appointment[]
 }
 
 model Payout {
@@ -520,9 +526,13 @@ model Payout {
   grossCents     Int
   shareCents     Int
   status         String @default("PENDENTE")
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
 
   clinic       Clinic       @relation(fields: [clinicId], references: [id])
   professional Professional @relation(fields: [professionalId], references: [id])
+
+  @@unique([clinicId, professionalId, period])
 }
 
 // Somente inserção (reforçar com permissões/trigger no banco).
@@ -571,4 +581,19 @@ model RecordTemplate {
   clinic Clinic @relation(fields: [clinicId], references: [id])
 
   @@index([clinicId])
+}
+
+model Expense {
+  id          String    @id @default(cuid())
+  clinicId    String
+  description String
+  category    String
+  amountCents Int
+  date        DateTime // competência/vencimento (dia, UTC)
+  paidAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+
+  @@index([clinicId, date])
 }

@@ -31,3 +31,34 @@ test("competência: validação e navegação entre meses", () => {
   assert.equal(shiftMonth("2026-12", 1), "2027-01");
   assert.equal(shiftMonth("2026-01", -1), "2025-12");
 });
+
+import { shareOf, valorPorExtenso } from "../src/lib/money.ts";
+import { toCsv } from "../src/lib/csv.ts";
+
+test("valor por extenso", () => {
+  assert.equal(valorPorExtenso(15075), "cento e cinquenta reais e setenta e cinco centavos");
+  assert.equal(valorPorExtenso(100), "um real");
+  assert.equal(valorPorExtenso(1), "um centavo");
+  assert.equal(valorPorExtenso(10000), "cem reais");
+  assert.equal(valorPorExtenso(12000), "cento e vinte reais");
+  assert.equal(valorPorExtenso(100000), "mil reais");
+  assert.equal(valorPorExtenso(123456), "mil, duzentos e trinta e quatro reais e cinquenta e seis centavos");
+  assert.equal(valorPorExtenso(200000), "dois mil reais");
+  assert.equal(valorPorExtenso(150000), "mil e quinhentos reais");
+  assert.equal(valorPorExtenso(0), "zero reais");
+});
+
+test("repasse por percentual", () => {
+  assert.equal(shareOf(100000, 40), 40000);
+  assert.equal(shareOf(33333, 50), 16667);
+  assert.equal(shareOf(1000, 150), 1000); // limitado a 100%
+  assert.equal(shareOf(1000, -5), 0);
+});
+
+test("CSV: separador, aspas e proteção contra fórmulas", () => {
+  const out = toCsv(["a", "b"], [["x;y", 'say "hi"'], ["=1+1", 5], [null, "-10"]]);
+  assert.ok(out.startsWith("\uFEFF"));
+  assert.ok(out.includes('"x;y";"say ""hi"""'));
+  assert.ok(out.includes("'=1+1;5"));
+  assert.ok(out.includes(";'-10"));
+});

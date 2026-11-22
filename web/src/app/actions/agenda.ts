@@ -169,13 +169,29 @@ export async function setStatusAction(formData: FormData) {
   }
   try {
     const reason = String(formData.get("reason") ?? "").trim().slice(0, 200);
-    await db.appointment.update({
-      where: { id },
-      data: {
-        status: status as AppointmentStatus,
-        cancelReason: status === "CANCELADA" ? reason || null : null,
-        cancelledAt: status === "CANCELADA" ? new Date() : null,
-      },
+    await db.$transaction(async (tx) => {
+      let packageId = a.packageId;
+      // Pacote de sessões: comparecer consome uma sessão; desfazer devolve.
+      if (status === "COMPARECEU" && !packageId) {
+        const pkgs = await tx.package.findMany({ where: { patientId: a.patientId, serviceId: a.serviceId, clinicId: user.clinicId }, orderBy: { createdAt: "asc" } });
+        const open = pkgs.find((p) => p.sessionsUsed < p.sessionsTotal);
+        if (open) {
+          await tx.package.update({ where: { id: open.id }, data: { sessionsUsed: { increment: 1 } } });
+          packageId = open.id;
+        }
+      } else if (status !== "COMPARECEU" && packageId) {
+        await tx.package.update({ where: { id: packageId }, data: { sessionsUsed: { decrement: 1 } } });
+        packageId = null;
+      }
+      await tx.appointment.update({
+        where: { id },
+        data: {
+          status: status as AppointmentStatus,
+          packageId,
+          cancelReason: status === "CANCELADA" ? reason || null : null,
+          cancelledAt: status === "CANCELADA" ? new Date() : null,
+        },
+      });
     });
   } catch (e) {
     if (isOverlapError(e)) backToDetail(id, CONFLICT);
@@ -202,7 +218,8 @@ export async function rescheduleAction(formData: FormData) {
   if (await hasConflict(a.professionalId, [{ startsAt: start, endsAt: end }], a.id)) backToDetail(id, CONFLICT);
   try {
     await db.$transaction([
-      db.appointment.update({ where: { id }, data: { startsAt: start, endsAt: end, status: "AGENDADA" } }),
+      db.appointment.update({ where: { id }, data: { startsAt: start, endsAt: end, status: "AGENDADA", packageId: null, cancelReason: null, cancelledAt: null } }),
+      ...(a.packageId ? [db.package.update({ where: { id: a.packageId }, data: { sessionsUsed: { decrement: 1 } } })] : []),
       // Novo horário: libera os lembretes já enviados para serem reenviados.
       db.automationRun.deleteMany({ where: { appointmentId: id } }),
     ]);

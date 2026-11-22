@@ -88,3 +88,13 @@ export function parseDateFlexible(s: string): string | null {
   if (y < 1900) return null;
   return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
+
+// Gera CSV para o Excel brasileiro: separador ";" e BOM UTF-8; neutraliza fórmulas (injeção de CSV).
+export function toCsv(headers: string[], rows: (string | number | null | undefined)[][]): string {
+  const cell = (v: string | number | null | undefined) => {
+    let s = v === null || v === undefined ? "" : String(v);
+    if (/^[=+\-@\t\r]/.test(s) && typeof v !== "number") s = `'${s}`;
+    return /[";\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  return "\uFEFF" + [headers, ...rows].map((r) => r.map(cell).join(";")).join("\r\n") + "\r\n";
+}

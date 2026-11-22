@@ -1,17 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
 import { importPatientsAction, type ImportState } from "@/app/actions/patients-admin";
+import { useKeptActionState } from "@/components/use-kept-form";
 
 const initial: ImportState = {};
 
 export function ImportForm() {
-  const [state, action, pending] = useActionState(importPatientsAction, initial);
+  const [state, onSubmit, pending] = useKeptActionState(importPatientsAction, initial);
 
   return (
     <div className="space-y-4">
-      <form action={action} className="space-y-3 rounded border p-4">
+      <form onSubmit={onSubmit} className="space-y-3 rounded border p-4">
         <label className="block text-sm">
           Arquivo CSV
           <input type="file" name="file" accept=".csv,text/csv,text/plain" required className="mt-1 block w-full rounded border bg-white p-2 text-sm" />

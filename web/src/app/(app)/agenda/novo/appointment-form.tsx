@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useState } from "react";
 import type { AppointmentFormState } from "@/app/actions/agenda";
+import { useKeptActionState } from "@/components/use-kept-form";
 
 const input = "w-full rounded border px-3 py-2 text-sm";
 
@@ -26,11 +27,11 @@ export function AppointmentForm({
   idempotencyKey: string;
   lockProfessional: boolean;
 }) {
-  const [state, formAction, pending] = useActionState(action, {});
+  const [state, onSubmit, pending] = useKeptActionState(action, {});
   const [patientId, setPatientId] = useState(defaults.patientId);
   const options = insurances.filter((i) => i.patientId === patientId);
   return (
-    <form action={formAction} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-3">
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       {state.error && <p role="alert" className="rounded bg-red-50 p-3 text-sm text-red-700">{state.error}</p>}
 

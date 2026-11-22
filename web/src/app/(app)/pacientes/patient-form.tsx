@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
 import type { PatientFormState } from "@/app/actions/patients";
+import { useKeptActionState } from "@/components/use-kept-form";
 
 type Props = {
   action: (prev: PatientFormState, formData: FormData) => Promise<PatientFormState>;
@@ -29,9 +29,9 @@ type Props = {
 const input = "rounded border px-3 py-2 text-sm";
 
 export function PatientForm({ action, mode, initial }: Props) {
-  const [state, formAction, pending] = useActionState(action, {});
+  const [state, onSubmit, pending] = useKeptActionState(action, {});
   return (
-    <form action={formAction} className="grid max-w-2xl gap-4 sm:grid-cols-2">
+    <form onSubmit={onSubmit} className="grid max-w-2xl gap-4 sm:grid-cols-2">
       {initial && <input type="hidden" name="id" value={initial.id} />}
       <label className="flex flex-col gap-1 text-sm sm:col-span-2">
         Nome completo
